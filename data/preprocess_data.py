@@ -8,7 +8,7 @@ def load_data_from_csv(filename:str) -> pd.DataFrame:
 
 def save_data_as_csv(df: pd.DataFrame,filename:str):
     """Save data from pandas df to csv"""
-    return df.to_csv(filename)
+    return df.to_csv(filename, index=False)
 
 def create_exploratory_inference_data(input_filename:str="bias_data.csv", output_filename:str="inference.csv"):
     data = load_data_from_csv(input_filename)
