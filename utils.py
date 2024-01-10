@@ -2,7 +2,6 @@
 
 # Load model directly
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from datasets import load_dataset
 import os
 
 def load_and_save_model_from_hub(model_name:str, save_dir:str="models/") -> (AutoModelForCausalLM):
