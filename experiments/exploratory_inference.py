@@ -33,6 +33,11 @@ if __name__=="__main__":
             #better understand what generate text produces TODO
             text = generate_text(text=prompt, model=model, tokenizer=tokenizer)
             results.loc[index, model_name] = text
+            if index%100 == 0:
+                print(index)
             #print(results.head())
         #Save results
         save_data_as_csv(df=results, filename="initial_inference_results.csv")
+
+    #TODO add inference checkpointing util
+    #TODO check how many sequences are being generated

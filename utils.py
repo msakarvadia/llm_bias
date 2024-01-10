@@ -55,10 +55,9 @@ def generate_text(model:AutoModelForCausalLM, tokenizer:AutoTokenizer, text:str=
         top_p=0.9
     )
 
-    print(sequences[0]["generated_text"])
-    print(sequences)
+    #print(sequences[0]["generated_text"])
 
-    return sequences
+    return sequences[0]["generated_text"]
 
 
 
