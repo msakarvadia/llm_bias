@@ -5,12 +5,12 @@ from data.preprocess_data import load_data_from_csv, save_data_as_csv
 import os.path
 
 models = [
+"meta-llama/Llama-2-70b-chat-hf",
+"meta-llama/Llama-2-70b-hf",
 "meta-llama/Llama-2-7b-chat-hf",
 "meta-llama/Llama-2-7b-hf",
 "meta-llama/Llama-2-13b-chat-hf",
 "meta-llama/Llama-2-13b-hf",
-"meta-llama/Llama-2-70b-chat-hf",
-"meta-llama/Llama-2-70b-hf",
 ]
 
 if __name__=="__main__":
