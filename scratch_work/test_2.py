@@ -8,6 +8,7 @@ checkpoint = "meta-llama/Llama-2-70b-chat-hf"
 #weights_location = hf_hub_download(checkpoint)
 weights_location = "/net/scratch/sakarvadia/.cache/huggingface/hub/models--meta-llama--Llama-2-70b-chat-hf/snapshots/e1ce257bd76895e0864f3b4d6c7ed3c4cdec93e2"
 
+weights_location = "/lus/grand/projects/SuperBERT/mansisak/hf_cache/models--meta-llama--Llama-2-70b-chat-hf/snapshots/cfe96d938c52db7c6d936f99370c0801b24233c4"
 # Create a model and initialize it with empty weights
 config = AutoConfig.from_pretrained(checkpoint)
 with init_empty_weights():
