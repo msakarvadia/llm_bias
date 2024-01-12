@@ -3,6 +3,7 @@ sys.path.append('../')
 from utils import load_quantized_model_and_tokenizer, assess_device_memory, generate_text
 from data.preprocess_data import load_data_from_csv, save_data_as_csv
 import os.path
+import pandas as pd
 
 models = [
 "meta-llama/Llama-2-70b-chat-hf",
@@ -38,7 +39,7 @@ if __name__=="__main__":
         #add column to csv for model name, append generated text to that column
         for index, row in data.iterrows():
             #skip rows that already have content
-            if results.loc[index, model_name] != "":
+            if not pd.isna(results.loc[index, model_name]):
                 continue
             prompt = row['prompt']
             #better understand what generate text produces TODO
