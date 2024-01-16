@@ -4,14 +4,14 @@
 #PBS -q preemptable
 #PBS -l filesystems=home:grand:eagle
 #PBS -A superbert
-#PBS -M sakarvadia
+#PBS -M sakarvadia@uchicago.edu
 
 cd "/lus/grand/projects/SuperBERT/mansisak/llm_bias"
 echo "working dir: "
 pwd
 
 module load conda
-conda activate env
+conda activate env/
 
 cd "/lus/grand/projects/SuperBERT/mansisak/llm_bias/experiments"
 echo "working dir: "
