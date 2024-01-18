@@ -5,52 +5,49 @@ from data.preprocess_data import load_data_from_csv, save_data_as_csv
 import os.path
 import pandas as pd
 
+import transformer_lens
+import transformer_lens.utils as utils
+from transformer_lens.hook_points import (
+    HookPoint,
+)  # Hooking utilities
+from transformer_lens import HookedTransformer
+
+from transformers import LlamaForCausalLM, LlamaTokenizer
+
 models = [
-"meta-llama/Llama-2-70b-chat-hf",
-"meta-llama/Llama-2-70b-hf",
-"meta-llama/Llama-2-7b-chat-hf",
+#"meta-llama/Llama-2-70b-chat-hf",
+#"meta-llama/Llama-2-70b-hf",
+#"meta-llama/Llama-2-7b-chat-hf",
 "meta-llama/Llama-2-7b-hf",
-"meta-llama/Llama-2-13b-chat-hf",
+#"meta-llama/Llama-2-13b-chat-hf",
 "meta-llama/Llama-2-13b-hf",
 ]
 
+import torch
+
 if __name__=="__main__":
 
-    #Load data
-    data = load_data_from_csv("../data/inference.csv")
-    results_file_path = "initial_inference_results.csv"
-    if os.path.isfile(results_file_path):
-        results = load_data_from_csv(results_file_path)
-    else:
-        results = data.copy()
 
     #iterate over models
     for m in models:
         model_name = m
 
-        #check if we have already started processing for a given model
-        if not model_name in results.columns:
-            results[model_name] = "" #make empty column for results from this model
 
         #Load model, tokenizer
-        model, tokenizer = load_quantized_model_and_tokenizer(model_name)
         assess_device_memory()
 
+        tokenizer = LlamaTokenizer.from_pretrained(model_name)
+        hf_model = LlamaForCausalLM.from_pretrained(model_name, 
+                                                    low_cpu_mem_usage=True,
+                                                    torch_dtype=torch.float16
+                                                   )
+
         #Load model into TransformerLens template
+        model = HookedTransformer.from_pretrained(model_name, hf_model=hf_model, tokenizer=tokenizer, device="cpu", fold_ln=False, center_writing_weights=False, center_unembed=False)
+        print(model)
 
-
-        """
-        #add column to csv for model name, append generated text to that column
-        for index, row in data.iterrows():
-            #skip rows that already have content
-            if not pd.isna(results.loc[index, model_name]):
-                continue
-            prompt = row['prompt']
-            #better understand what generate text produces TODO
-            text = generate_text(text=prompt, model=model, tokenizer=tokenizer)
-            results.loc[index, model_name] = text
-            if index%50 == 0:
-                print(results.tail())
-                #Save results
-                save_data_as_csv(df=results, filename=results_file_path)
-        """
+        #model = model.to("cuda" if torch.cuda.is_available() else "cpu")
+        #print("model moved to GPU")
+        assess_device_memory()
+        output = model.generate("The capital of Germany is", max_new_tokens=20, temperature=0)
+        print(output)
