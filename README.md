@@ -9,7 +9,7 @@ Requirements:
 ```
 git clone https://github.com/msakarvadia/llm_bias.git
 cd llm_bias
-conda create --name env python==3.10 (or conda create --prefix=env python=3.10)
+conda create -p env python==3.10 (or conda create --prefix=env python=3.10)
 conda activate env
 pip install -r requirements.txt
 ```
