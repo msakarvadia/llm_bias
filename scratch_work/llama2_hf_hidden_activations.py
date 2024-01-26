@@ -10,12 +10,17 @@ import torch
 from torch import nn
 from typing import Optional, Tuple
 import warnings
+from transformers import AutoTokenizer, LlamaForCausalLM
 
 from transformers.models.llama.modeling_llama import (LlamaFlashAttention2, 
-                                                      LlamaSdpaAttention, 
+                                                      apply_rotary_pos_emb,
+                                                      repeat_kv,
+                                                      #LlamaSdpaAttention, 
                                                       LlamaAttention,
                                                       LlamaMLP,
                                                       LlamaRMSNorm )
+
+from transformers.cache_utils import Cache, DynamicCache
 
 models = [
 "meta-llama/Llama-2-7b-hf",
@@ -25,6 +30,98 @@ models = [
 #"meta-llama/Llama-2-13b-chat-hf",
 #"meta-llama/Llama-2-13b-hf",
 ]
+
+
+class LlamaSdpaAttention(LlamaAttention):
+    """
+    Llama attention module using torch.nn.functional.scaled_dot_product_attention. This module inherits from
+    `LlamaAttention` as the weights of the module stays untouched. The only changes are on the forward pass to adapt to
+    SDPA API.
+    """
+
+    # Adapted from LlamaAttention.forward
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_value: Optional[Cache] = None,
+        output_attentions: bool = False,
+        use_cache: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+        if output_attentions:
+            # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
+            logger.warning_once(
+                "LlamaModel is using LlamaSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, "
+                'but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.'
+            )
+            return super().forward(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+            )
+
+        bsz, q_len, _ = hidden_states.size()
+
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+        kv_seq_len = key_states.shape[-2]
+        if past_key_value is not None:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+        if past_key_value is not None:
+            cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+        key_states = repeat_kv(key_states, self.num_key_value_groups)
+        value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+        if attention_mask is not None:
+            if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                raise ValueError(
+                    f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                )
+
+        # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
+        # Reference: https://github.com/pytorch/pytorch/issues/112577.
+        if query_states.device.type == "cuda" and attention_mask is not None:
+            query_states = query_states.contiguous()
+            key_states = key_states.contiguous()
+            value_states = value_states.contiguous()
+
+        attn_output = torch.nn.functional.scaled_dot_product_attention(
+            query_states,
+            key_states,
+            value_states,
+            attn_mask=attention_mask,
+            dropout_p=self.attention_dropout if self.training else 0.0,
+            # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
+            is_causal=self.is_causal and attention_mask is None and q_len > 1,
+        )
+        print(attn_output.shape)
+
+        attn_output = attn_output.transpose(1, 2).contiguous()
+        print(attn_output.shape)
+        attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+        print(attn_output.shape)
+
+        attn_output = self.o_proj(attn_output)
+
+        print("HERE")
+        print(attn_output.shape)
+        return attn_output, None, past_key_value
 
 LLAMA_ATTENTION_CLASSES = {
     "eager": LlamaAttention,
@@ -44,7 +141,7 @@ class LlamaDecoderLayer_Modified(nn.Module):
         self.input_layernorm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-        #self.attn_activations = None
+        self.attn_activations = None
 
     def forward(
         self,
@@ -90,8 +187,8 @@ class LlamaDecoderLayer_Modified(nn.Module):
             **kwargs,
         )
 
-        #self.attn_activations = hidden_states
-        #print("Dim of attn activations: ", self.attn_activations.shape)
+        self.attn_activations = hidden_states
+        print("Dim of attn activations: ", self.attn_activations.shape)
 
         hidden_states = residual + hidden_states
 
@@ -113,27 +210,17 @@ class LlamaDecoderLayer_Modified(nn.Module):
 
 if __name__=="__main__":
 
-    #Load data
-    data = load_data_from_csv("../data/inference.csv")
-    results_file_path = "initial_inference_results.csv"
-    if os.path.isfile(results_file_path):
-        results = load_data_from_csv(results_file_path)
-    else:
-        results = data.copy()
-
     #iterate over models
     for m in models:
         model_name = m
 
-        #check if we have already started processing for a given model
-        if not model_name in results.columns:
-            results[model_name] = "" #make empty column for results from this model
-
         #Load model, tokenizer
-        model, tokenizer = load_quantized_model_and_tokenizer(model_name)
+        #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
+
+        model = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
+        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
         assess_device_memory()
 
-        print(model.config)
 
         inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
         outputs = model(**inputs, output_hidden_states=True)
@@ -142,11 +229,12 @@ if __name__=="__main__":
         # Assign new decoder layer:
         layer_idx = 3
         print(type(model.model.layers[layer_idx]))
-        model.model.layers[layer_idx] = LlamaDecoderLayer_Modified(model.config, layer_idx)
-
+        #model.model.layers[layer_idx] = LlamaDecoderLayer_Modified(model.config, layer_idx)
+        model.model.layers[layer_idx].self_attn = LlamaSdpaAttention(model.config, layer_idx)
         print("Did assing new layer")
 
         outputs = model(**inputs)
+        print(model.config)
        
         #print(outputs['hidden_states'][layer_idx].shape) # This is outputing residual stream at given layer
         #print("model functions:", dir(model.model.layers[layer_idx].self_attn))
