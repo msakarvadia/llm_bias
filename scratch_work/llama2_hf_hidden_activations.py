@@ -202,10 +202,8 @@ class LlamaDecoderLayer_Modified(nn.Module):
             **kwargs,
         )
 
-        self.attn_activations = hidden_states
-        print("Dim of attn activations: ", self.attn_activations.shape)
-        self.head_outputs = head_outputs
-        print("Dim of attn head outputs: ", self.head_outputs.shape)
+        print("Dim of attn activations: ", hidden_states.shape)
+        print("Dim of attn head outputs: ",head_outputs.shape)
 
         hidden_states = residual + hidden_states
 
@@ -222,6 +220,10 @@ class LlamaDecoderLayer_Modified(nn.Module):
 
         if use_cache:
             outputs += (present_key_value,)
+        
+        ###
+        outputs += (head_outputs,)
+        ###
 
         return outputs
 
@@ -243,14 +245,28 @@ if __name__=="__main__":
         outputs = model(**inputs, output_hidden_states=True)
         print("did inference part 1")
 
+        activation = {}
+        def get_activation(name):
+            def hook(model, input, output):
+                activation[name] = output
+            return hook
+
         # Assign new decoder layer:
         layer_idx = 3
+        # https://discuss.pytorch.org/t/forward-hook-activations-for-loss-computation/142903/2 
+        # use pytorch hooks to grab the activations
         print(type(model.model.layers[layer_idx]))
         model.model.layers[layer_idx] = LlamaDecoderLayer_Modified(model.config, layer_idx)
         model.model.layers[layer_idx].self_attn = LlamaSdpaAttention(model.config, layer_idx)
         print("Did assigning new layer")
 
+
+        # Attach hooks
+        model.model.layers[layer_idx].register_forward_hook(get_activation("decoder_3"))
+
         outputs = model(**inputs)
+        #we append attn head outputs to the end of the output:
+        print(activation["decoder_3"][-1].size())
         print(model.config)
        
         #print(outputs['hidden_states'][layer_idx].shape) # This is outputing residual stream at given layer
