@@ -122,7 +122,7 @@ class LlamaSdpaAttention(LlamaAttention):
         for i in range(self.num_heads):
             head_out[:,i,:,:] = attn_output[:,:,i,:] @ new_W_O[i]
 
-        head_out = torch.sum(head_out, dim=1)
+        #head_out = torch.sum(head_out, dim=1)
         ########
             
             
@@ -131,12 +131,12 @@ class LlamaSdpaAttention(LlamaAttention):
         attn_output = self.o_proj(attn_output)
         
         ### compare
-        print(attn_output[0][-1])
-        print(head_out[0][-1])
+        #print(attn_output[0][-1])
+        #print(head_out[0][-1])
 
         ###
 
-        return attn_output, None, past_key_value
+        return attn_output, None, past_key_value, head_out
 
 LLAMA_ATTENTION_CLASSES = {
     "eager": LlamaAttention,
@@ -192,7 +192,7 @@ class LlamaDecoderLayer_Modified(nn.Module):
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states, self_attn_weights, present_key_value, head_outputs  = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -204,6 +204,8 @@ class LlamaDecoderLayer_Modified(nn.Module):
 
         self.attn_activations = hidden_states
         print("Dim of attn activations: ", self.attn_activations.shape)
+        self.head_outputs = head_outputs
+        print("Dim of attn head outputs: ", self.head_outputs.shape)
 
         hidden_states = residual + hidden_states
 
@@ -244,9 +246,9 @@ if __name__=="__main__":
         # Assign new decoder layer:
         layer_idx = 3
         print(type(model.model.layers[layer_idx]))
-        #model.model.layers[layer_idx] = LlamaDecoderLayer_Modified(model.config, layer_idx)
+        model.model.layers[layer_idx] = LlamaDecoderLayer_Modified(model.config, layer_idx)
         model.model.layers[layer_idx].self_attn = LlamaSdpaAttention(model.config, layer_idx)
-        print("Did assing new layer")
+        print("Did assigning new layer")
 
         outputs = model(**inputs)
         print(model.config)
