@@ -110,17 +110,32 @@ class LlamaSdpaAttention(LlamaAttention):
             # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
             is_causal=self.is_causal and attention_mask is None and q_len > 1,
         )
-        print(attn_output.shape)
+       
 
         attn_output = attn_output.transpose(1, 2).contiguous()
-        print(attn_output.shape)
+        ############
+
+        W_O = self.o_proj.weight
+        new_W_O = torch.reshape(W_O.T, (self.num_heads, self.head_dim, self.hidden_size))
+
+        head_out = torch.zeros((bsz, self.num_heads,q_len, self.hidden_size))
+        for i in range(self.num_heads):
+            head_out[:,i,:,:] = attn_output[:,:,i,:] @ new_W_O[i]
+
+        head_out = torch.sum(head_out, dim=1)
+        ########
+            
+            
+
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
-        print(attn_output.shape)
-
         attn_output = self.o_proj(attn_output)
+        
+        ### compare
+        print(attn_output[0][-1])
+        print(head_out[0][-1])
 
-        print("HERE")
-        print(attn_output.shape)
+        ###
+
         return attn_output, None, past_key_value
 
 LLAMA_ATTENTION_CLASSES = {
