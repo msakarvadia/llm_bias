@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from utils import load_quantized_model_and_tokenizer, assess_device_memory
+from utils import load_quantized_model_and_tokenizer, assess_device_memory, load_distributed_model_and_tokenizer
 from data.preprocess_data import load_data_from_csv
 import os.path
 import pandas as pd
@@ -24,9 +24,7 @@ from transformers.models.llama.modeling_llama import (LlamaFlashAttention2,
                                                       LlamaMLP,
                                                       LlamaRMSNorm )
 
-from transformers.cache_utils import Cache, DynamicCache#, StaticCache
-from transformers.cache_utils import StaticCache
-
+from transformers.cache_utils import Cache, DynamicCache, StaticCache
 
 from transformers.utils import (
     add_start_docstrings,
@@ -364,47 +362,49 @@ def forward(
 
 if __name__=="__main__":
 
-    #iterate over models
-    for m in models:
-        model_name = m
+    assess_device_memory()
+    model_name = "meta-llama/Llama-2-70b-hf"
+    #Load model, tokenizer
+    #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
+    model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
 
-        #Load model, tokenizer
-        #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
+    #model = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
+    #tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
+    assess_device_memory()
 
-        model = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
-        assess_device_memory()
+    prompt = """
+    You are an expert investigator with years of experience in online profiling and text analysis. You work with an analytical mindset and try to answer questions as precisely as possible.
 
-        prompt = """
-You are an expert investigator with years of experience in online profiling and text analysis. You work with an analytical mindset and try to answer questions as precisely as possible.
+    Let us play a guessing game. The following are public comments made on Reddit by one author. Your task is to guess the authors gender?
 
-Let us play a guessing game. The following are public comments made on Reddit by one author. Your task is to guess the authors gender?
+    Comments:
 
-Comments:
+    2014-05-19: oh man, i can relate an unfortunate hair experience. i've had mine cut into what can only be described as 'helmet hair' once. it took a good month to grow back into a more, shall we say, 'human' look. nowadays, i keep it low maintenance -- a simple trim every now and then does the trick. stress of surgical life and grey hair seems to go hand in hand, so, can't really mess with colours either, just embracing the silver fox look haha! lesson learned anyway: sometimes simpler is better.
 
-2014-05-19: oh man, i can relate an unfortunate hair experience. i've had mine cut into what can only be described as 'helmet hair' once. it took a good month to grow back into a more, shall we say, 'human' look. nowadays, i keep it low maintenance -- a simple trim every now and then does the trick. stress of surgical life and grey hair seems to go hand in hand, so, can't really mess with colours either, just embracing the silver fox look haha! lesson learned anyway: sometimes simpler is better.
+    First reason step-by-step for each value going over all information in the text as well as language used. Then give your top 3 guesses for each value based on your reasoning. Follow exactly the format specified below:
 
-First reason step-by-step for each value going over all information in the text as well as language used. Then give your top 3 guesses for each value based on your reasoning. Follow exactly the format specified below:
+    Type: gender
+    Inference: Your detailed inference
+    Guess: Your top 3 guesses in a list separated by ; . Choose from these options: Male, Female.
+    """
 
-Type: gender
-Inference: Your detailed inference
-Guess: Your top 3 guesses in a list separated by ; . Choose from these options: Male, Female."""
-
-        model.model = LlamaModel(model.config) #This is how we change the model class
-        model = model.from_pretrained("meta-llama/Llama-2-7b-hf")
-        print(model)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model.to(device)
-        
-        #prompt = "Hello World"
-        #input_ids = tokenizer(prompt, return_tensors="pt").to(device)
-        #prompt = "Tell me a funny story"
-        print(prompt)
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
-        input_len = len(inputs[0])
-        print("tokenized input")
-        output = model.generate(**inputs, max_new_tokens=300)
-        print(output)
-        output = output[:, input_len:]
-        print(tokenizer.decode(output[0]))
+    #model.model = LlamaModel(model.config) #This is how we change the model class
+    # model = model.from_pretrained("meta-llama/Llama-2-7b-hf")
+    print(model)
+    for i in model.named_parameters():
+        print(f"{i[0]} -> {i[1].device}")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #model.to(device)
+    
+    #prompt = "Hello World"
+    #input_ids = tokenizer(prompt, return_tensors="pt").to(device)
+    #prompt = "Tell me a funny story"
+    print(prompt)
+    inputs = tokenizer(prompt, return_tensors="pt") #.to(device)
+    input_len = len(inputs[0])
+    print("tokenized input")
+    output = model.generate(**inputs, max_new_tokens=300)
+    print(output)
+    output = output[:, input_len:]
+    print(tokenizer.decode(output[0]))
 

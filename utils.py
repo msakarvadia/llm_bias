@@ -1,8 +1,10 @@
 """This file contains useful helper functions for reserach."""
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 
 # Load model directly
 from transformers import (
     AutoTokenizer,
+    AutoConfig,
     AutoModelForCausalLM,
     pipeline,
     BitsAndBytesConfig,
@@ -22,8 +24,31 @@ def load_quantized_model_and_tokenizer(model_name:str) -> (AutoModelForCausalLM,
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=bnb_config,
-        device_map="auto",
+        device_map=0,
+        #device_map="auto",
         trust_remote_code=True,
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.pad_token_id = tokenizer.eos_token_id    # for open-ended generation
+
+    return model, tokenizer
+
+def load_distributed_model_and_tokenizer(model_name:str) -> (AutoModelForCausalLM, AutoTokenizer):
+    """This function downloads functions from huggingface and save them locally,
+    for llama models you will need a token that proves you have a licence to download """
+    print("model name: ", model_name)
+
+    # Load the checkpoint and dispatch it to the right devices
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        #load_in_8bit=True, #NOTE (MS): add this in for larger model 
+        #trust_remote_code = True,
+        torch_dtype=torch.float16,
+        #torch_dtype=(
+        #    torch.float16 if config.dtype == "float16" else torch.float32
+        #),
+        device_map="auto",
     )
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
