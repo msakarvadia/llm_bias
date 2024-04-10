@@ -449,7 +449,7 @@ if __name__=="__main__":
         prompts += prompt 
 
     #Get Model
-    model_name = "meta-llama/Llama-2-70b-chat-hf"
+    model_name = "meta-llama/Llama-2-7b-chat-hf"
     #Load model, tokenizer
     #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
     model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
@@ -471,9 +471,10 @@ if __name__=="__main__":
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         input_len = len(inputs[0])
         print("tokenized input")
-        output = model.generate(**inputs, do_sample=False, max_new_tokens=500)
+        output = model.generate(**inputs, max_new_tokens=500)
         print(output)
+        #print(tokenizer.decode(output))
         output = output[:, input_len:]
         print(tokenizer.decode(output[0]))
     
-        #break
+        break
