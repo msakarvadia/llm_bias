@@ -433,6 +433,31 @@ def create_prompts(profile: Profile) -> List[Prompt]:
 
     return prompts
 
+def generate(model, tokenizer, input_embeds, mask, max_new_tokens):
+    predictions = []
+    for i in range(max_new_tokens):
+        logits = model(inputs_embeds = input_embeds).logits
+        #Need method to get embeddings of next token  
+        predicted_token = torch.argmax(logits[0][-1]) #batch index, last token position
+
+        if predicted_token.item() == 2: #this is the Llama eos_token id
+            break
+
+        predictions.append( predicted_token.item() )
+        predicted_token = torch.reshape(predicted_token, (1,1))
+        #print(predicted_token)
+
+        #embed the predicted tokens:
+        embeddings = model(predicted_token, return_dict=True, output_hidden_states=True)['hidden_states']
+        first_layer_embeddings = embeddings[0]
+        #print("shape of embeded predicted token: ", first_layer_embeddings.shape)
+        input_embeds = torch.cat((input_embeds, first_layer_embeddings), 1)
+        #print("shape of embeded for next round of inference: ", input_embeds.shape)
+        
+        # print("predicted token: ", tokenizer.decode( predicted_token[0]))
+    #print("predicted tokens : ", predictions)
+    print("Decoded Predictions : ", tokenizer.decode( predictions))
+    return 0
 
 if __name__=="__main__":
     #Load data
@@ -445,12 +470,11 @@ if __name__=="__main__":
     prompts = []
     for profile in profiles:
         prompt = create_prompts(profile)
-        print("prompt: ", prompt)
+        #print("prompt: ", prompt)
         prompts += prompt 
 
-    #Get Model
-    model_name = "meta-llama/Llama-2-7b-chat-hf"
     #Load model, tokenizer
+    model_name = "meta-llama/Llama-2-70b-chat-hf"
     #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
     model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
 
@@ -467,14 +491,29 @@ if __name__=="__main__":
     #model.to(device)
     for i in prompts:
         prompt = i.get_prompt()
-        print(i.get_prompt())
+        print("------------------- MODEL PROMPTS: -----------------")
+        print(prompt)
+        print("------------------- MODEL PROMPT END -----------------")
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        print("Successfully tokenized prompts: ", inputs)
         input_len = len(inputs[0])
+
+        # Get model embeddings:
+        embeddings = model(inputs['input_ids'],return_dict=True, output_hidden_states=True)['hidden_states']
+        first_layer_embeddings = embeddings[0]
+        print("embedding dim: ", first_layer_embeddings.shape)
+        
+        #Do deterministic inference on model
+        outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
+        
         print("tokenized input")
         output = model.generate(**inputs, max_new_tokens=500)
         print(output)
         #print(tokenizer.decode(output))
         output = output[:, input_len:]
-        print(tokenizer.decode(output[0]))
+        print(output.shape)
+        print("------------------- MODEL GENERATIONS: -----------------")
+        print(tokenizer.decode(output[0], skip_special_tokens=True).strip())
+        print("------------------- MODEL GENERATIONS END -------------- ")
     
         break
