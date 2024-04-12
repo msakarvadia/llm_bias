@@ -434,9 +434,13 @@ def create_prompts(profile: Profile) -> List[Prompt]:
     return prompts
 
 def generate(model, tokenizer, input_embeds, mask, max_new_tokens):
+    #TODO: Add caching to past_key_values to speed up inference
     predictions = []
+    past_key_values= None
     for i in range(max_new_tokens):
-        logits = model(inputs_embeds = input_embeds).logits
+        outputs = model(inputs_embeds = input_embeds, use_cache=False, past_key_values=past_key_values)
+        logits = outputs.logits
+        #past_key_values= outputs.past_key_values
         #Need method to get embeddings of next token  
         predicted_token = torch.argmax(logits[0][-1]) #batch index, last token position
 
@@ -456,7 +460,9 @@ def generate(model, tokenizer, input_embeds, mask, max_new_tokens):
         
         # print("predicted token: ", tokenizer.decode( predicted_token[0]))
     #print("predicted tokens : ", predictions)
+    print("------------------- MODEL GENERATIONS: -----------------")
     print("Decoded Predictions : ", tokenizer.decode( predictions))
+    print("------------------- MODEL GENERATIONS END -------------- ")
     return 0
 
 if __name__=="__main__":
@@ -495,7 +501,7 @@ if __name__=="__main__":
         print(prompt)
         print("------------------- MODEL PROMPT END -----------------")
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
-        print("Successfully tokenized prompts: ", inputs)
+        #print("Successfully tokenized prompts: ", inputs)
         input_len = len(inputs[0])
 
         # Get model embeddings:
@@ -504,16 +510,14 @@ if __name__=="__main__":
         print("embedding dim: ", first_layer_embeddings.shape)
         
         #Do deterministic inference on model
-        outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
+        # outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
         
-        print("tokenized input")
         output = model.generate(**inputs, max_new_tokens=500)
-        print(output)
+        #print(output)
         #print(tokenizer.decode(output))
         output = output[:, input_len:]
-        print(output.shape)
+        #print(output.shape)
         print("------------------- MODEL GENERATIONS: -----------------")
         print(tokenizer.decode(output[0], skip_special_tokens=True).strip())
         print("------------------- MODEL GENERATIONS END -------------- ")
     
-        break
