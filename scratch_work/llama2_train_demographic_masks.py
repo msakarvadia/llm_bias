@@ -513,6 +513,7 @@ if __name__=="__main__":
         outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
         
         '''
+        # Non-deterministic sampling of tokens
         output = model.generate(**inputs, max_new_tokens=500)
         #print(output)
         #print(tokenizer.decode(output))
