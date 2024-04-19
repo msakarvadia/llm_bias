@@ -480,7 +480,7 @@ if __name__=="__main__":
         prompts += prompt 
 
     #Load model, tokenizer
-    model_name = "meta-llama/Llama-2-70b-chat-hf"
+    model_name = "meta-llama/Llama-2-13b-chat-hf"
     #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
     model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
 
@@ -510,8 +510,9 @@ if __name__=="__main__":
         print("embedding dim: ", first_layer_embeddings.shape)
         
         #Do deterministic inference on model
-        # outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
+        outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
         
+        '''
         output = model.generate(**inputs, max_new_tokens=500)
         #print(output)
         #print(tokenizer.decode(output))
@@ -520,4 +521,4 @@ if __name__=="__main__":
         print("------------------- MODEL GENERATIONS: -----------------")
         print(tokenizer.decode(output[0], skip_special_tokens=True).strip())
         print("------------------- MODEL GENERATIONS END -------------- ")
-    
+        '''
