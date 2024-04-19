@@ -11,6 +11,7 @@ from torch import nn
 from typing import List, Optional, Tuple, Union
 import warnings
 from transformers import AutoTokenizer, LlamaForCausalLM
+from tqdm import tqdm
 
 from transformers.modeling_outputs import (BaseModelOutputWithPast) 
 from transformers.models.llama.modeling_llama import (LlamaFlashAttention2, 
@@ -165,7 +166,7 @@ if __name__=="__main__":
         prompts += prompt 
 
     #Load model, tokenizer
-    model_name = "meta-llama/Llama-2-7b-chat-hf"
+    model_name = "meta-llama/Llama-2-70b-chat-hf"
     #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
     model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
 
@@ -180,17 +181,37 @@ if __name__=="__main__":
         print(f"{i[0]} -> {i[1].device}")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     #model.to(device)
-    for i in prompts:
+
+    """
+    if os.path.exists("synthetic_llama7b_embeddings.pt"):
+        embedding_list = torch.load("synthetic_llama7b_embeddings.pt")
+        first_embedding = embedding_list[0]
+        print("RETREIVED embedding dim for first layer: ", first_embedding[0].shape)
+    """
+    
+
+    embedding_list = []
+    model.eval()
+    for i in tqdm(prompts):
+        #assess_device_memory()
         prompt = i.get_prompt()
+        """
         print("------------------- MODEL PROMPTS: -----------------")
         print(prompt)
         print("------------------- MODEL PROMPT END -----------------")
+        """
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         #print("Successfully tokenized prompts: ", inputs)
-        input_len = len(inputs[0])
+        #input_len = len(inputs[0])
 
         # Get model embeddings:
-        embeddings = model(inputs['input_ids'],return_dict=True, output_hidden_states=True)['hidden_states']
+        with torch.no_grad():
+            embeddings = model(inputs['input_ids'],return_dict=True, output_hidden_states=True)['hidden_states']
+            embeddings = [x.cpu() for x in embeddings]
+            embedding_list.append(embeddings)
+
+        #print(torch.cuda.memory_summary())
+        """ #Extra compute not needed rn
         first_layer_embeddings = embeddings[0]
         print("num of embeddings for full model: ", len(embeddings))
         print("embedding dim for first layer: ", first_layer_embeddings.shape)
@@ -209,3 +230,5 @@ if __name__=="__main__":
         print("------------------- MODEL GENERATIONS: -----------------")
         print(tokenizer.decode(output[0], skip_special_tokens=True).strip())
         print("------------------- MODEL GENERATIONS END -------------- ")
+        """
+    torch.save(embedding_list, "synthetic_llama70b_embeddings.pt")
