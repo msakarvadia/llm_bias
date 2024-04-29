@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../')
+from src.models.model_factory import get_model
 from utils import load_quantized_model_and_tokenizer, assess_device_memory, load_distributed_model_and_tokenizer
 from data.preprocess_data import load_data_from_csv
 import os.path

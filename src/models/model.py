@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Iterator
 
+import sys
+sys.path.append('../')
+#from configs import ModelConfig
+#from prompts import Prompt, Conversation
+
 from src.configs import ModelConfig
 from src.prompts import Prompt, Conversation
-
 
 class BaseModel(ABC):
     def __init__(self, config: ModelConfig):
