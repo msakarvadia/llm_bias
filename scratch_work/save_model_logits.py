@@ -226,6 +226,8 @@ if __name__=="__main__":
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         #print("Successfully tokenized prompts: ", inputs)
         input_len = len(inputs[0])
+        results = model_from_other_repo.predict(i)
+        print("New model generation: ", results)
 
         # Get model embeddings:
         with torch.no_grad():
