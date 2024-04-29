@@ -21,31 +21,10 @@ import warnings
 from transformers import AutoTokenizer, LlamaForCausalLM
 from tqdm import tqdm
 
-from transformers.modeling_outputs import (BaseModelOutputWithPast) 
-from transformers.models.llama.modeling_llama import (LlamaFlashAttention2, 
-                                                      LlamaModel, 
-                                                      LlamaDecoderLayer,
-                                                      LlamaPreTrainedModel,
-                                                      apply_rotary_pos_emb,
-                                                      repeat_kv,
-                                                      #LlamaSdpaAttention, 
-                                                      LlamaAttention,
-                                                      LlamaMLP,
-                                                      LlamaRMSNorm )
-
-from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from reddit_utils import load_data, type_to_str, type_to_options
 from reddit_types import Profile
-from prompt import Prompt
+from src.prompts.prompt import Prompt
 
-from transformers.utils import (
-    add_start_docstrings,
-    add_start_docstrings_to_model_forward,
-    is_flash_attn_2_available,
-    is_flash_attn_greater_or_equal_2_10,
-    logging,
-    replace_return_docstrings,
-)
 
 models = [
 "meta-llama/Llama-2-7b-hf",
@@ -127,37 +106,6 @@ def create_prompts(profile: Profile) -> List[Prompt]:
 
     return prompts
 
-def generate(model, tokenizer, input_embeds, mask, max_new_tokens):
-    #TODO: Add caching to past_key_values to speed up inference
-    predictions = []
-    past_key_values= None
-    for i in range(max_new_tokens):
-        outputs = model(inputs_embeds = input_embeds, use_cache=False, past_key_values=past_key_values)
-        logits = outputs.logits
-        #past_key_values= outputs.past_key_values
-        #Need method to get embeddings of next token  
-        predicted_token = torch.argmax(logits[0][-1]) #batch index, last token position
-
-        if predicted_token.item() == 2: #this is the Llama eos_token id
-            break
-
-        predictions.append( predicted_token.item() )
-        predicted_token = torch.reshape(predicted_token, (1,1))
-        #print(predicted_token)
-
-        #embed the predicted tokens:
-        embeddings = model(predicted_token, return_dict=True, output_hidden_states=True)['hidden_states']
-        first_layer_embeddings = embeddings[0]
-        #print("shape of embeded predicted token: ", first_layer_embeddings.shape)
-        input_embeds = torch.cat((input_embeds, first_layer_embeddings), 1)
-        #print("shape of embeded for next round of inference: ", input_embeds.shape)
-        
-        # print("predicted token: ", tokenizer.decode( predicted_token[0]))
-    #print("predicted tokens : ", predictions)
-    print("------------------- MODEL GENERATIONS: -----------------")
-    print("Decoded Predictions : ", tokenizer.decode( predictions))
-    print("------------------- MODEL GENERATIONS END -------------- ")
-    return 0
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
@@ -184,38 +132,18 @@ if __name__=="__main__":
     prompts = []
     for profile in profiles:
         prompt = create_prompts(profile)
-        #print("prompt: ", prompt)
         prompts += prompt 
 
     #Load model, tokenizer
     model_name = "meta-llama/Llama-2-7b-chat-hf"
-    #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
-    model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
-            
     model_from_other_repo = get_model(cfg.gen_model)
 
-    #model = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
-    #tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
     assess_device_memory()
 
-    #model.model = LlamaModel(model.config) #This is how we change the model class
-    # model = model.from_pretrained("meta-llama/Llama-2-7b-hf")
-    print(model)
-    for i in model.named_parameters():
-        print(f"{i[0]} -> {i[1].device}")
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #model.to(device)
-
-    """
-    if os.path.exists("synthetic_llama7b_embeddings.pt"):
-        embedding_list = torch.load("synthetic_llama7b_embeddings.pt")
-        first_embedding = embedding_list[0]
-        print("RETREIVED embedding dim for first layer: ", first_embedding[0].shape)
-    """
     
 
-    embedding_list = []
-    model.eval()
+    logit_list = []
+    #model.eval()
     for i in tqdm(prompts):
         print(i.to_dict())
         #assess_device_memory()
@@ -223,55 +151,18 @@ if __name__=="__main__":
         print("------------------- MODEL PROMPTS: -----------------")
         print(prompt)
         print("------------------- MODEL PROMPT END -----------------")
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        #inputs = tokenizer(prompt, return_tensors="pt").to(device)
         #print("Successfully tokenized prompts: ", inputs)
-        input_len = len(inputs[0])
+        #input_len = len(inputs[0])
         #results = model_from_other_repo.predict(i)
         results, logits  = model_from_other_repo.predict_logits(i)
+        logits = [x.cpu() for x in logits]
+        logit_list.append(logits)
         print("------------------- MODEL GENERATIONS: -----------------")
         print("New model generation: ", results)
         print("------------------- MODEL GENERATIONS END -------------- ")
-        print("# of input tokens: ", input_len)
+        #print("# of input tokens: ", input_len)
         print("Num logits: ", len(logits))
         print("Size of logits: ", logits[0].shape)
 
-        # Get model embeddings:
-        """
-        with torch.no_grad():
-            output = model.generate(**inputs, max_new_tokens=800, return_dict_in_generate=True, output_logits=True)
-        print("------------------- MODEL GENERATIONS: -----------------")
-        print(tokenizer.decode(output.sequences[0][input_len:], skip_special_tokens=True).strip())
-        print("------------------- MODEL GENERATIONS END -------------- ")
-        print("# of input tokens: ", input_len)
-        print("Num predicted tokens: ", output.sequences[0][input_len:].shape)
-        print("Num logits: ", len(output.logits))
-        print("Size of logits: ", output.logits[0].shape)
-
-        break
-            #embeddings = model(inputs['input_ids'],return_dict=True, output_hidden_states=True)['hidden_states']
-            #embeddings = [x.cpu() for x in embeddings]
-            #embedding_list.append(embeddings)
-        """
-
-        #print(torch.cuda.memory_summary())
-        """ #Extra compute not needed rn
-        first_layer_embeddings = embeddings[0]
-        print("num of embeddings for full model: ", len(embeddings))
-        print("embedding dim for first layer: ", first_layer_embeddings.shape)
-        print("embedding dim for second layer: ", embeddings[1].shape)
-        #TODO: need to save these embeddings somehow such that we can cluster them later
-        
-        #Do deterministic inference on model
-        #outputs = generate(model, tokenizer, first_layer_embeddings, mask=None, max_new_tokens=500)
-        
-        # Non-deterministic sampling of tokens
-        output = model.generate(**inputs, max_new_tokens=500, output_hidden_states=True)
-        #print(output)
-        #print(tokenizer.decode(output))
-        output = output[:, input_len:]
-        #print(output.shape)
-        print("------------------- MODEL GENERATIONS: -----------------")
-        print(tokenizer.decode(output[0], skip_special_tokens=True).strip())
-        print("------------------- MODEL GENERATIONS END -------------- ")
-        """
-    torch.save(embedding_list, "synthetic_llama70b_embeddings.pt")
+    torch.save(logit_list, "synthetic_llama7b_logits.pt")

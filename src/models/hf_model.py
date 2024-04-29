@@ -46,6 +46,24 @@ class HFModel(BaseModel):
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.padding_side = "left"
 
+    def predict_logits(self, input: Prompt, **kwargs):
+        text = input.get_prompt().rstrip()
+
+        model_text = self.apply_model_template(text)
+
+        input_ids = self.tokenizer.encode(
+            model_text,
+            return_tensors="pt",
+        ).to(self.device)
+        input_length = len(input_ids[0])
+
+        output = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=True, **self.config.args)
+
+        # For decoder only models:
+        out_ids = output.sequences[:, input_length:]
+
+        return self.tokenizer.decode(out_ids[0], skip_special_tokens=True).strip(), output.logits
+
     def predict(self, input: Prompt, **kwargs):
         text = input.get_prompt().rstrip()
 
