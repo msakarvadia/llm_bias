@@ -1,6 +1,13 @@
 import sys
 sys.path.append('../')
+import argparse
 from src.models.model_factory import get_model
+from src.utils.initialization import (
+        read_config_from_yaml,
+        seed_everything,
+        set_credentials,
+        get_out_file,
+        )
 from utils import load_quantized_model_and_tokenizer, assess_device_memory, load_distributed_model_and_tokenizer
 from data.preprocess_data import load_data_from_csv
 import os.path
@@ -153,6 +160,20 @@ def generate(model, tokenizer, input_embeds, mask, max_new_tokens):
     return 0
 
 if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_path",
+        type=str,
+        default="configs/acs_config.yaml",
+        help="Path to the config file",
+        )
+    args = parser.parse_args()
+
+    cfg = read_config_from_yaml(args.config_path)
+    seed_everything(cfg.seed)
+    set_credentials(cfg)
+    #f, path = get_out_file(cfg)
+
     #Load data
     print("loading data...")
     synthetic_data_path = "../data/synthetic_dataset.jsonl" 
@@ -170,6 +191,8 @@ if __name__=="__main__":
     model_name = "meta-llama/Llama-2-7b-chat-hf"
     #model, tokenizer = load_quantized_model_and_tokenizer(model_name)
     model, tokenizer =  load_distributed_model_and_tokenizer(model_name)
+            
+    model_from_other_repo = get_model(cfg.gen_model)
 
     #model = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
     #tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
