@@ -226,10 +226,17 @@ if __name__=="__main__":
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         #print("Successfully tokenized prompts: ", inputs)
         input_len = len(inputs[0])
-        results = model_from_other_repo.predict(i)
+        #results = model_from_other_repo.predict(i)
+        results, logits  = model_from_other_repo.predict_logits(i)
+        print("------------------- MODEL GENERATIONS: -----------------")
         print("New model generation: ", results)
+        print("------------------- MODEL GENERATIONS END -------------- ")
+        print("# of input tokens: ", input_len)
+        print("Num logits: ", len(logits))
+        print("Size of logits: ", logits[0].shape)
 
         # Get model embeddings:
+        """
         with torch.no_grad():
             output = model.generate(**inputs, max_new_tokens=800, return_dict_in_generate=True, output_logits=True)
         print("------------------- MODEL GENERATIONS: -----------------")
@@ -244,6 +251,7 @@ if __name__=="__main__":
             #embeddings = model(inputs['input_ids'],return_dict=True, output_hidden_states=True)['hidden_states']
             #embeddings = [x.cpu() for x in embeddings]
             #embedding_list.append(embeddings)
+        """
 
         #print(torch.cuda.memory_summary())
         """ #Extra compute not needed rn
