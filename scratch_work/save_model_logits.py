@@ -148,23 +148,23 @@ if __name__=="__main__":
         prompt = create_prompts(profile)
         prompts += prompt 
 
-    #Load model, tokenizer
-    model_name = "meta-llama/Llama-2-7b-chat-hf"
-    model_from_other_repo = get_model(cfg.gen_model)
-
-    assess_device_memory()
-
     #Get gpt2 for sequence classification
     model_name_or_path = "gpt2"
     n_labels = 2
 
     # Get model configuration.
-    #print('Loading configuraiton...')
-    #model_config = GPT2Config.from_pretrained(pretrained_model_name_or_path=model_name_or_path, num_labels=n_labels)
+    print('Loading configuraiton...')
+    model_config = GPT2Config(num_labels=n_labels,
+                                      n_embd=4096, # This is side of Llama vocab
+                                      n_head=8,
+                                      n_layer=4,
+                                      )
 
     # Get the actual model.
     print('Loading model...')
-    seq_model = GPT2ForSequenceClassification.from_pretrained(model_name_or_path, num_labels=n_labels)
+    seq_model = GPT2ForSequenceClassification(model_config)
+    #seq_model = GPT2ForSequenceClassification.from_pretrained(model_name_or_path, num_labels=n_labels, )
+    #seq_model = GPT2ForSequenceClassification.from_pretrained(model_name_or_path, model_config )
 
     # Get model's tokenizer.
     print('Loading tokenizer...')
@@ -186,6 +186,12 @@ if __name__=="__main__":
     print('Model loaded to `%s`'%device)
 
     
+    #Load model, tokenizer
+    model_name = "meta-llama/Llama-2-7b-chat-hf"
+    model_from_other_repo = get_model(cfg.gen_model)
+
+    assess_device_memory()
+
 
     logit_list = []
     #model.eval()
@@ -217,11 +223,16 @@ if __name__=="__main__":
         #TODO (MS) move the seed stuff into the seed function
         #TODO (MS) get the new logits
         print("input token len: ", input_len)
-        new_generation_hidden_states = hidden_states[0][-1][:, :, :]
+        new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
         print(new_generation_hidden_states.shape)
+        hs = []
+        for token in range(len(hidden_states)):
+            layer_num = -1
+            hs.append(hidden_states[token][layer_num][:, -1, :])
 
-        print("inputing logits into seq model")
-        seq_model(inputs_embeds=torch.stack(logits, dim=0).to(device))
+        print("inputing hs into seq model of size: ", torch.stack(hs, dim=1).shape)
+        #TODO: make the logits translated backwards into the input embeds
+        seq_model(inputs_embeds=torch.stack(hs, dim=1).to(device))
 
 
     torch.save(logit_list, "synthetic_llama7b_logits.pt")
