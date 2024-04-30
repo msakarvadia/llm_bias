@@ -25,6 +25,18 @@ from reddit_utils import load_data, type_to_str, type_to_options
 from reddit_types import Profile
 from src.prompts.prompt import Prompt
 
+from transformers import (set_seed,
+                            TrainingArguments,
+                            Trainer,
+                            GPT2Config,
+                            AutoTokenizer,
+                            GPT2Tokenizer,
+                            AdamW, 
+                            get_linear_schedule_with_warmup,
+                            GPT2ForSequenceClassification)
+
+
+
 
 models = [
 "meta-llama/Llama-2-7b-hf",
@@ -119,6 +131,8 @@ if __name__=="__main__":
 
     cfg = read_config_from_yaml(args.config_path)
     seed_everything(cfg.seed)
+    # Set seed for reproducibility.
+    set_seed(cfg.seed)
     set_credentials(cfg)
     #f, path = get_out_file(cfg)
 
@@ -139,6 +153,37 @@ if __name__=="__main__":
     model_from_other_repo = get_model(cfg.gen_model)
 
     assess_device_memory()
+
+    #Get gpt2 for sequence classification
+    model_name_or_path = "gpt2"
+    n_labels = 2
+
+    # Get model configuration.
+    #print('Loading configuraiton...')
+    #model_config = GPT2Config.from_pretrained(pretrained_model_name_or_path=model_name_or_path, num_labels=n_labels)
+
+    # Get the actual model.
+    print('Loading model...')
+    seq_model = GPT2ForSequenceClassification.from_pretrained(model_name_or_path, num_labels=n_labels)
+
+    # Get model's tokenizer.
+    print('Loading tokenizer...')
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    # default to left padding
+    tokenizer.padding_side = "left"
+    # Define PAD Token = EOS Token = 50256
+    tokenizer.pad_token = tokenizer.eos_token
+
+    # resize model embedding to match new tokenizer
+    seq_model.resize_token_embeddings(len(tokenizer))
+
+    # fix model padding token id
+    seq_model.config.pad_token_id = seq_model.config.eos_token_id
+
+    # Load model to defined device.
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    seq_model.to(device)
+    print('Model loaded to `%s`'%device)
 
     
 
@@ -164,5 +209,6 @@ if __name__=="__main__":
         #print("# of input tokens: ", input_len)
         print("Num logits: ", len(logits))
         print("Size of logits: ", logits[0].shape)
+
 
     torch.save(logit_list, "synthetic_llama7b_logits.pt")
