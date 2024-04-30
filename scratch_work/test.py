@@ -1,11 +1,39 @@
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    pipeline,
-    BitsAndBytesConfig,
-)
 import torch
+from transformers import AutoTokenizer, GPT2ForSequenceClassification
+import torch
+from transformers import AutoTokenizer, GPT2LMHeadModel
+print("imported libraries")
 
+tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2", download_mode='force_redownload')
+print("imported tokenizer")
+model = GPT2LMHeadModel.from_pretrained("openai-community/gpt2", download_mode='force_redownload')
+
+inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+outputs = model(**inputs, labels=inputs["input_ids"])
+loss = outputs.loss
+logits = outputs.logits
+
+
+tokenizer = AutoTokenizer.from_pretrained("microsoft/DialogRPT-updown")
+print("imported tokenizer")
+model = GPT2ForSequenceClassification.from_pretrained("microsoft/DialogRPT-updown")
+print("imported model")
+
+inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+
+with torch.no_grad():
+        logits = model(**inputs).logits
+
+predicted_class_id = logits.argmax().item()
+
+# To train a model on `num_labels` classes, you can pass `num_labels=num_labels` to `.from_pretrained(...)`
+num_labels = len(model.config.id2label)
+model = GPT2ForSequenceClassification.from_pretrained("microsoft/DialogRPT-updown", num_labels=num_labels)
+
+labels = torch.tensor([1])
+loss = model(**inputs, labels=labels).loss
+
+'''
 def assess_device_memory():
     free_in_GB = int(torch.cuda.mem_get_info()[0]/1024**3)
     print("free GB:", free_in_GB)
@@ -55,3 +83,4 @@ sequences = generation_pipe(
 )
 
 print(sequences[0]["generated_text"])
+'''
