@@ -57,12 +57,14 @@ class HFModel(BaseModel):
         ).to(self.device)
         input_length = len(input_ids[0])
 
-        output = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=True, **self.config.args)
+        output = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=True, output_hidden_states=True, **self.config.args)
+        print("TOKEN INPUT LENGTH: ", input_length)
+        print("produced geneartions shape: ", output.sequences.shape)
 
         # For decoder only models:
         out_ids = output.sequences[:, input_length:]
 
-        return self.tokenizer.decode(out_ids[0], skip_special_tokens=True).strip(), output.logits
+        return self.tokenizer.decode(out_ids[0], skip_special_tokens=True).strip(), output.logits, output.hidden_states, input_length
 
     def predict(self, input: Prompt, **kwargs):
         text = input.get_prompt().rstrip()

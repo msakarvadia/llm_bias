@@ -181,7 +181,7 @@ if __name__=="__main__":
     seq_model.config.pad_token_id = seq_model.config.eos_token_id
 
     # Load model to defined device.
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     seq_model.to(device)
     print('Model loaded to `%s`'%device)
 
@@ -200,7 +200,12 @@ if __name__=="__main__":
         #print("Successfully tokenized prompts: ", inputs)
         #input_len = len(inputs[0])
         #results = model_from_other_repo.predict(i)
-        results, logits  = model_from_other_repo.predict_logits(i)
+        results, logits, hidden_states, input_len  = model_from_other_repo.predict_logits(i)
+        #shape of hidden states: [num of pormpts, num_of layers, batch_size, seq_len, embed_dim]
+        print(type(hidden_states[0]))
+        print("LAST LAYER Hidden states shape: ", hidden_states[0][-1].shape)
+
+
         logits = [x.cpu() for x in logits]
         logit_list.append(logits)
         print("------------------- MODEL GENERATIONS: -----------------")
@@ -209,6 +214,14 @@ if __name__=="__main__":
         #print("# of input tokens: ", input_len)
         print("Num logits: ", len(logits))
         print("Size of logits: ", logits[0].shape)
+        #TODO (MS) move the seed stuff into the seed function
+        #TODO (MS) get the new logits
+        print("input token len: ", input_len)
+        new_generation_hidden_states = hidden_states[0][-1][:, :, :]
+        print(new_generation_hidden_states.shape)
+
+        print("inputing logits into seq model")
+        seq_model(inputs_embeds=torch.stack(logits, dim=0).to(device))
 
 
     torch.save(logit_list, "synthetic_llama7b_logits.pt")
