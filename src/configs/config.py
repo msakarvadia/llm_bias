@@ -488,6 +488,9 @@ class Config(PBM):
     gen_embeds: str = Field(
         default=None, description="File that has embedding of model generations."
     )
+    gen_human_labels: str = Field(
+        default=None, description="File that has the human evaluated labels for model generation."
+    )
     task_config: (
         ACSConfig
         | PANConfig
