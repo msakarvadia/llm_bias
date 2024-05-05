@@ -163,8 +163,6 @@ if __name__=="__main__":
     # Get the actual model.
     print('Loading model...')
     seq_model = GPT2ForSequenceClassification(model_config)
-    #seq_model = GPT2ForSequenceClassification.from_pretrained(model_name_or_path, num_labels=n_labels, )
-    #seq_model = GPT2ForSequenceClassification.from_pretrained(model_name_or_path, model_config )
 
     # Get model's tokenizer.
     print('Loading tokenizer...')
@@ -193,48 +191,34 @@ if __name__=="__main__":
     assess_device_memory()
 
 
-    logit_list = []
+    last_layer_embedding_list = []
     #model.eval()
     for i in tqdm(prompts):
-        print(i.to_dict())
-        #assess_device_memory()
+        #print(i.to_dict())
         prompt = i.get_prompt()
-        print("------------------- MODEL PROMPTS: -----------------")
-        print(prompt)
-        print("------------------- MODEL PROMPT END -----------------")
-        #inputs = tokenizer(prompt, return_tensors="pt").to(device)
-        #print("Successfully tokenized prompts: ", inputs)
-        #input_len = len(inputs[0])
-        #results = model_from_other_repo.predict(i)
-        results, logits, hidden_states, input_len  = model_from_other_repo.predict_logits(i)
-        #shape of hidden states: [num of pormpts, num_of layers, batch_size, seq_len, embed_dim]
-        print(type(hidden_states[0]))
-        print("LAST LAYER Hidden states shape: ", hidden_states[0][-1].shape)
+        #print("------------------- MODEL PROMPTS: -----------------")
+        #print(prompt)
+        #print("------------------- MODEL PROMPT END -----------------")
+        with torch.no_grad():
+            results, hidden_states, input_len  = model_from_other_repo.predict_logits(i)
 
 
-        logits = [x.cpu() for x in logits]
-        logit_list.append(logits)
-        print("------------------- MODEL GENERATIONS: -----------------")
-        print("New model generation: ", results)
-        print("------------------- MODEL GENERATIONS END -------------- ")
-        #print("# of input tokens: ", input_len)
-        print("Num logits: ", len(logits))
-        print("Size of logits: ", logits[0].shape)
-        #TODO (MS) move the seed stuff into the seed function
-        #TODO (MS) get the new logits
-        print("input token len: ", input_len)
+        #print("------------------- MODEL GENERATIONS: -----------------")
+        #print("New model generation: ", results)
+        #print("------------------- MODEL GENERATIONS END -------------- ")
         new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
-        print(new_generation_hidden_states.shape)
         hs = []
         for token in range(len(hidden_states)):
             layer_num = -1
             hs.append(hidden_states[token][layer_num][:, -1, :])
 
-        print("inputing hs into seq model of size: ", torch.stack(hs, dim=1).shape)
-        #TODO: make the logits translated backwards into the input embeds
-        inputs = torch.stack(hs, dim=1).to(device)
+        #print("inputing hs into seq model of size: ", torch.stack(hs, dim=1).shape)
+        inputs = torch.stack(hs, dim=1) #.to(device)
+        last_layer_embedding_list.append(inputs)
+        ''' TODO (MS): this works
         labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
         output = seq_model(inputs_embeds=inputs, labels=labels) #labels are one-hot
         print("classifier output label: ", torch.argmax(output.logits[0]))
-    
+        '''
 
+    torch.save(last_layer_embedding_list, "embeddings for llama7b_generation_last_layer_embeddings.pt")

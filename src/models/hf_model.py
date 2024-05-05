@@ -57,22 +57,21 @@ class HFModel(BaseModel):
         ).to(self.device)
         input_length = len(input_ids[0])
 
-        output = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=True, output_hidden_states=True, **self.config.args)
-        print("TOKEN INPUT LENGTH: ", input_length)
-        print("produced geneartions shape: ", output.sequences.shape)
-        print("logit shape: ", output.logits[0].shape)
-        print("num of hidden states: ", len(output.hidden_states)) #hidden states (# of new tokens, # of layers, )
-        print("# of layers in hidden states len: ", len(output.hidden_states[-1])) #hidden states (# of new tokens, # of layers, )
-        print("hidden states shape of last new token at last layer: ", output.hidden_states[-1][-1].shape)
-        for i in range(5):
-            print("token index: ", i)
-            print("hidden states shape of last i'th token at last layer: ", output.hidden_states[i][-1].shape)
+        output = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, **self.config.args)
+        #print("TOKEN INPUT LENGTH: ", input_length)
+        #print("produced geneartions shape: ", output.sequences.shape)
+        #print("num of hidden states: ", len(output.hidden_states)) #hidden states (# of new tokens, # of layers, )
+        #print("# of layers in hidden states len: ", len(output.hidden_states[-1])) #hidden states (# of new tokens, # of layers, )
+        #print("hidden states shape of last new token at last layer: ", output.hidden_states[-1][-1].shape)
+        #for i in range(5):
+        #    print("token index: ", i)
+        #    print("hidden states shape of last i'th token at last layer: ", output.hidden_states[i][-1].shape)
 
 
         # For decoder only models:
         out_ids = output.sequences[:, input_length:]
 
-        return self.tokenizer.decode(out_ids[0], skip_special_tokens=True).strip(), output.logits, output.hidden_states, input_length
+        return self.tokenizer.decode(out_ids[0], skip_special_tokens=True).strip(), output.hidden_states, input_length
 
     def predict(self, input: Prompt, **kwargs):
         text = input.get_prompt().rstrip()
