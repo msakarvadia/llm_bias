@@ -150,7 +150,7 @@ if __name__=="__main__":
 
     #Get gpt2 for sequence classification
     model_name_or_path = "gpt2"
-    n_labels = 2
+    n_labels = 3
 
     # Get model configuration.
     print('Loading configuraiton...')
@@ -232,7 +232,9 @@ if __name__=="__main__":
 
         print("inputing hs into seq model of size: ", torch.stack(hs, dim=1).shape)
         #TODO: make the logits translated backwards into the input embeds
-        seq_model(inputs_embeds=torch.stack(hs, dim=1).to(device))
+        inputs = torch.stack(hs, dim=1).to(device)
+        labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
+        output = seq_model(inputs_embeds=inputs, labels=labels) #labels are one-hot
+        print("classifier output label: ", torch.argmax(output.logits[0]))
+    
 
-
-    torch.save(logit_list, "synthetic_llama7b_logits.pt")
