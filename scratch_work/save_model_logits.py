@@ -193,6 +193,7 @@ if __name__=="__main__":
 
     last_layer_embedding_list = []
     #model.eval()
+    count = 0
     for i in tqdm(prompts):
         #print(i.to_dict())
         prompt = i.get_prompt()
@@ -215,10 +216,13 @@ if __name__=="__main__":
         #print("inputing hs into seq model of size: ", torch.stack(hs, dim=1).shape)
         inputs = torch.stack(hs, dim=1) #.to(device)
         last_layer_embedding_list.append(inputs)
+        count += 1
         ''' TODO (MS): this works
         labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
         output = seq_model(inputs_embeds=inputs, labels=labels) #labels are one-hot
         print("classifier output label: ", torch.argmax(output.logits[0]))
         '''
+        if count == 10:
+            break
 
-    torch.save(last_layer_embedding_list, "embeddings for llama7b_generation_last_layer_embeddings.pt")
+    torch.save(last_layer_embedding_list, "embeddings_llama7b_generation_last_layer_embeddings.pt")
