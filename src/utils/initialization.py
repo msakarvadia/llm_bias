@@ -7,6 +7,7 @@ import numpy as np
 import openai
 import yaml
 from pydantic import ValidationError
+import torch
 
 from src.configs import Config
 
@@ -63,9 +64,9 @@ def seed_everything(seed: int) -> None:
     os.environ["PL_GLOBAL_SEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
-    # torch.manual_seed(seed)
-    # torch.cuda.manual_seed_all(seed)
-    # torch.set_num_threads(1)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.set_num_threads(1)
 
 
 def set_credentials(model_cfg: Optional[Config] = None) -> None:

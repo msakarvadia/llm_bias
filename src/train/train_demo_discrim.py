@@ -136,17 +136,6 @@ if __name__=="__main__":
     set_credentials(cfg)
     #f, path = get_out_file(cfg)
 
-    #Load data
-    print("loading data...")
-    synthetic_data_path = "../../data/synthetic_dataset.jsonl" 
-    profiles = load_data(synthetic_data_path)
-    print(profiles[0].comments)
-
-    # Create prompts
-    prompts = []
-    for profile in profiles:
-        prompt = create_prompts(profile)
-        prompts += prompt 
 
     #Get gpt2 for sequence classification
     model_name_or_path = "gpt2"
@@ -184,41 +173,14 @@ if __name__=="__main__":
     print('Model loaded to `%s`'%device)
 
     
-    #Load model, tokenizer
-    model_name = "meta-llama/Llama-2-7b-chat-hf"
-    model_from_other_repo = get_model(cfg.gen_model)
+    #load embeddings
+    generation_embeds = torch.load(cfg.gen_embeds)
 
     assess_device_memory()
 
+    for i in generation_embeds:
 
-    last_layer_embedding_list = []
-    #model.eval()
-    for i in tqdm(prompts):
-        #print(i.to_dict())
-        prompt = i.get_prompt()
-        #print("------------------- MODEL PROMPTS: -----------------")
-        #print(prompt)
-        #print("------------------- MODEL PROMPT END -----------------")
-        with torch.no_grad():
-            results, hidden_states, input_len  = model_from_other_repo.predict_logits(i)
-
-
-        #print("------------------- MODEL GENERATIONS: -----------------")
-        #print("New model generation: ", results)
-        #print("------------------- MODEL GENERATIONS END -------------- ")
-        new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
-        hs = []
-        for token in range(len(hidden_states)):
-            layer_num = -1
-            hs.append(hidden_states[token][layer_num][:, -1, :])
-
-        #print("inputing hs into seq model of size: ", torch.stack(hs, dim=1).shape)
-        inputs = torch.stack(hs, dim=1) #.to(device)
-        last_layer_embedding_list.append(inputs)
-        ''' TODO (MS): this works
         labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
-        output = seq_model(inputs_embeds=inputs, labels=labels) #labels are one-hot
+        output = seq_model(inputs_embeds=i, labels=labels) #labels are one-hot
         print("classifier output label: ", torch.argmax(output.logits[0]))
-        '''
 
-    torch.save(last_layer_embedding_list, "embeddings for llama7b_generation_last_layer_embeddings.pt")

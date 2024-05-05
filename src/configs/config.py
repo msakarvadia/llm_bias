@@ -485,6 +485,9 @@ class Config(PBM):
     task: Task = Field(
         default=None, description="Task to run", choices=list(Task.__members__.values())
     )
+    gen_embeds: str = Field(
+        default=None, description="File that has embedding of model generations."
+    )
     task_config: (
         ACSConfig
         | PANConfig
