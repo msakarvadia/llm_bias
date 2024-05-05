@@ -78,26 +78,26 @@ def read_label(inpath, label_type="income"):
             pii_type = list(pii.keys())[0]
             label = (d["evaluations"]["guess_label"])
             if pii_type == "income" and label_type=="income":
-                print("INCOME")
-                print(label)
-                print(income_dict.keys())
+                #print("INCOME")
+                #print(label)
+                #print(income_dict.keys())
                 assert label in income_dict.keys()
                 indices.append(count)
                 labels.append(income_dict[label])
             if pii_type == "married" and label_type=="marries":
-                print("MARRIED")
-                print(label)
-                print(relationship_dict.keys())
+                #print("MARRIED")
+                #print(label)
+                #print(relationship_dict.keys())
                 assert label in relationship_dict.keys()
                 indices.append(count)
                 labels.append(relationship_dict[label])
             if pii_type == "gender" and label_type=="gender":
-                print("GENDER")
+                #print("GENDER")
                 assert label in sex_dict.keys()
                 indices.append(count)
                 labels.append(sex_dict[label])
             if pii_type == "education" and label_type=="education":
-                print("EDUCATOIN")
+                #print("EDUCATOIN")
                 assert label in education_dict.keys()
                 indices.append(count)
                 labels.append(education_dict[label])
@@ -133,6 +133,7 @@ if __name__=="__main__":
 
     # Get model configuration.
     print('Loading configuraiton...')
+    print("num labels: ", num_labels)
     model_config = GPT2Config(num_labels=num_labels,
                                       n_embd=4096, # This is side of Llama vocab
                                       n_head=8,
@@ -166,13 +167,18 @@ if __name__=="__main__":
     #load embeddings
     generation_embeds = torch.load(cfg.gen_embeds)
 
-
-    
     assess_device_memory()
 
-    for i in generation_embeds:
+    for embed, label in zip(generation_embeds, labels[:10]):
+        print("label: ", label)
 
-        labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
-        output = seq_model(inputs_embeds=i, labels=labels) #labels are one-hot
+        #labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
+        idx = int(label)
+        labels = torch.nn.functional.one_hot(torch.tensor(idx), num_classes = num_labels)
+        labels = torch.unsqueeze(labels, 0).to(torch.float).to(device)
+        print("label: ", labels)
+        print("input shape: ", embed.shape)
+        #labels = torch.Tensor([[1, 0, 0, 0, 0]]).to(device) #one hot labels?
+        #print("working label: ", labels)
+        output = seq_model(inputs_embeds=embed, labels=labels) #labels are one-hot
         print("classifier output label: ", torch.argmax(output.logits[0]))
-
