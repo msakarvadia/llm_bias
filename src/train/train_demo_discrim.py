@@ -14,6 +14,7 @@ from utils import load_quantized_model_and_tokenizer, assess_device_memory, load
 from data.preprocess_data import load_data_from_csv
 import os.path
 import pandas as pd
+import logging
 
 from transformers import LlamaConfig
 import torch
@@ -22,6 +23,7 @@ from typing import List, Optional, Tuple, Union
 import warnings
 from transformers import AutoTokenizer, LlamaForCausalLM
 from tqdm import tqdm
+from sklearn.metrics import classification_report, accuracy_score
 
 from src.utils.reddit_utils import load_data, type_to_str, type_to_options
 from src.utils.reddit_types import Profile
@@ -105,9 +107,33 @@ def read_label(inpath, label_type="income"):
         num_labels = len(set(labels))
         return labels, indices, num_labels
 
-def train(model, inputs, labels):
+def train(model, inputs, labels_original, optimizer, epochs):
+    model.train()
 
-    return 0
+    for i in range(epochs):
+        predictions = []
+        avg_loss = 0
+        for batch, label in tqdm(zip(inputs, labels_original)):
+            model.zero_grad()
+
+            idx = int(label)
+            labels = torch.nn.functional.one_hot(torch.tensor(idx), num_classes = num_labels)
+            labels = torch.unsqueeze(labels, 0).to(torch.float).to(device)
+            output = seq_model(inputs_embeds=batch, labels=labels) #labels are one-hot
+            predictions.append(torch.argmax(output.logits[0]).item())
+            #print("classifier output label: ", torch.argmax(output.logits[0]))
+            #print("classifier output loss: ", output.loss)
+
+            output.loss.backward()
+            avg_loss += output.loss
+            optimizer.step()
+
+        print("num data points: ", len(labels_original))
+        print("Avg Loss: ", avg_loss / len(labels_original))
+        train_acc = accuracy_score(labels_original, predictions)
+        print("Train acc: ", train_acc)
+        
+    return predictions
 
 def eval(model, inputs, labels):
     model.eval()
@@ -141,7 +167,7 @@ if __name__=="__main__":
     model_name_or_path = "gpt2"
 
     # Get model configuration.
-    print('Loading configuraiton...')
+    print('Loading configuration...')
     print("num labels: ", num_labels)
     model_config = GPT2Config(num_labels=num_labels,
                                       n_embd=4096, # This is side of Llama vocab
@@ -179,16 +205,11 @@ if __name__=="__main__":
 
     assess_device_memory()
 
-    for embed, label in zip(generation_embeds_current, labels):
-        print("label: ", label)
+    optimizer = torch.optim.AdamW(seq_model.parameters(),
+                                        lr = 2e-5, # default is 5e-5, our notebook had 2e-5
+                                        eps = 1e-8 # default is 1e-8.
+                                        )
 
-        #labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
-        idx = int(label)
-        labels = torch.nn.functional.one_hot(torch.tensor(idx), num_classes = num_labels)
-        labels = torch.unsqueeze(labels, 0).to(torch.float).to(device)
-        print("label: ", labels)
-        print("input shape: ", embed.shape)
-        #labels = torch.Tensor([[1, 0, 0, 0, 0]]).to(device) #one hot labels?
-        #print("working label: ", labels)
-        output = seq_model(inputs_embeds=embed, labels=labels) #labels are one-hot
-        print("classifier output label: ", torch.argmax(output.logits[0]))
+    logging.getLogger("transformers").setLevel(logging.ERROR)
+    print(labels)
+    predictions = train(seq_model, generation_embeds_current, labels, optimizer, cfg.epochs)
