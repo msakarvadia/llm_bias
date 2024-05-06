@@ -80,31 +80,27 @@ def read_label(inpath, label_type="income"):
             pii_type = list(pii.keys())[0]
             label = (d["evaluations"]["guess_label"])
             if pii_type == "income" and label_type=="income":
-                #print("INCOME")
-                #print(label)
-                #print(income_dict.keys())
                 assert label in income_dict.keys()
                 indices.append(count)
                 labels.append(income_dict[label])
-            if pii_type == "married" and label_type=="marries":
-                #print("MARRIED")
-                #print(label)
-                #print(relationship_dict.keys())
+                num_labels = len(set(income_dict.values()))
+            if pii_type == "married" and label_type=="married":
                 assert label in relationship_dict.keys()
                 indices.append(count)
                 labels.append(relationship_dict[label])
+                num_labels = len(set(relationship_dict.values()))
             if pii_type == "gender" and label_type=="gender":
-                #print("GENDER")
                 assert label in sex_dict.keys()
                 indices.append(count)
                 labels.append(sex_dict[label])
+                num_labels = len(set(sex_dict.values()))
             if pii_type == "education" and label_type=="education":
-                #print("EDUCATOIN")
                 assert label in education_dict.keys()
                 indices.append(count)
                 labels.append(education_dict[label])
+                num_labels = len(set(education_dict.values()))
             count += 1
-        num_labels = len(set(labels))
+        #num_labels = len(set(labels))
         return labels, indices, num_labels
 
 def train(model, inputs, labels_original, optimizer, epochs):
@@ -161,7 +157,7 @@ if __name__=="__main__":
     #load human labels
     print("human labeled eval path: ", cfg.gen_human_labels)
     label_type = "income"
-    labels, indices, num_labels = read_label(cfg.gen_human_labels, label_type)
+    labels, indices, num_labels = read_label(cfg.gen_human_labels, cfg.demographic)
 
     #Get gpt2 for sequence classification
     model_name_or_path = "gpt2"

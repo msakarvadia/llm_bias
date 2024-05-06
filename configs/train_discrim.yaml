@@ -5,6 +5,7 @@ dryrun: False
 save_prompts: True
 timeout: 0.0
 epochs: 10
+demographic: "married"
 gen_embeds: "/pscratch/sd/m/mansisak/llm_bias/src/train/embeddings_llama7b_generation_last_layer_embeddings.pt" 
 gen_human_labels: "/pscratch/sd/m/mansisak/llm_bias/data/predicted_synthethic_llama2_7b_eval_human_fixed.jsonl" 
 task_config: 

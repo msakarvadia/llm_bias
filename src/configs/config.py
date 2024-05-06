@@ -488,6 +488,9 @@ class Config(PBM):
     gen_embeds: str = Field(
         default=None, description="File that has embedding of model generations."
     )
+    demographic: str = Field(
+        default="income", description="Name of demographic category with which to train the discriminator"
+    )
     gen_human_labels: str = Field(
         default=None, description="File that has the human evaluated labels for model generation."
     )
