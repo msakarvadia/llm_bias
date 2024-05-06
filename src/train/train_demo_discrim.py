@@ -105,6 +105,15 @@ def read_label(inpath, label_type="income"):
         num_labels = len(set(labels))
         return labels, indices, num_labels
 
+def train(model, inputs, labels):
+
+    return 0
+
+def eval(model, inputs, labels):
+    model.eval()
+    with torch.no_grad():
+        return
+    return 0
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
@@ -166,8 +175,6 @@ if __name__=="__main__":
     
     #load embeddings
     generation_embeds = torch.load(cfg.gen_embeds)
-    print(len(indices))
-    print(len(generation_embeds))
     generation_embeds_current = [ generation_embeds[i] for i in indices]
 
     assess_device_memory()
