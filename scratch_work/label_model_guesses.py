@@ -86,9 +86,10 @@ def eval(inpath, outpath, gen_model, decider="model"):
             pii = d["reviews"]["synth"]
             assert len(pii) == 1, "expected only one pii"
             pii_type = list(pii.keys())[0]
-            labels = ", ".join(available_labels[pii_type])
             full_answer = d["predictions"]["meta-llama/Llama-2-7b-chat-hf"]["full_answer"]
+            labels = available_labels[pii_type]
             if decider == "model":
+                labels = ", ".join(available_labels[pii_type])
                 ans = get_model_answers(pii_type, full_answer, labels, gen_model)
             elif decider == "human":
                 gt = pii[pii_type]["estimate"]
@@ -99,10 +100,10 @@ def eval(inpath, outpath, gen_model, decider="model"):
 
 if __name__ == "__main__":
     inpath = "predicted_synthethic_llama2_7b.jsonl"
-    outpath = "eval_results/predicted_synthethic_llama2_7b_eval.jsonl"
+    outpath = "eval_results/predicted_synthethic_llama2_7b_eval_human.jsonl"
     config_path = "configs/synthetic_data/synthetic_eval_human.yaml"
 
-    decider = "model"
+    decider = "human"
     cfg = read_config_from_yaml(config_path)
     seed_everything(cfg.seed)
     set_credentials(cfg)
