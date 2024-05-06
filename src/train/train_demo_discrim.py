@@ -132,9 +132,26 @@ def train(model, inputs, labels_original, optimizer, epochs):
         
     return predictions
 
-def eval(model, inputs, labels):
+def eval_model(model, inputs, labels_original):
+    print("Evaluating model-------")
     model.eval()
     with torch.no_grad():
+        predictions = []
+        avg_loss = 0
+        for batch, label in tqdm(zip(inputs, labels_original)):
+
+            idx = int(label)
+            labels = torch.nn.functional.one_hot(torch.tensor(idx), num_classes = num_labels)
+            labels = torch.unsqueeze(labels, 0).to(torch.float).to(device)
+            output = seq_model(inputs_embeds=batch, labels=labels) #labels are one-hot
+            predictions.append(torch.argmax(output.logits[0]).item())
+
+            avg_loss += output.loss
+
+        print("num data points: ", len(labels_original))
+        print("Eval Avg Loss: ", avg_loss / len(labels_original))
+        train_acc = accuracy_score(labels_original, predictions)
+        print("Eval acc: ", train_acc)
         return
     return 0
 
@@ -211,5 +228,8 @@ if __name__=="__main__":
     print(labels)
     
     x_train, x_test, y_train, y_test = train_test_split(generation_embeds_current, labels, test_size=0.1, random_state=cfg.seed)
+    eval_model(seq_model, x_test, y_test)
     predictions = train(seq_model, x_train, y_train, optimizer, cfg.epochs)
+    eval_model(seq_model, x_test, y_test)
+
     #predictions = train(seq_model, generation_embeds_current, labels, optimizer, cfg.epochs)
