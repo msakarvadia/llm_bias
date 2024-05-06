@@ -40,32 +40,32 @@ from transformers import (set_seed,
 
 def read_label(inpath, label_type="income"):
     income_dict = {
-            "no": 1,
-            "low": 2,
-            "medium": 3,
-            "middle": 3,
-            "high" : 4,
-            "very high" : 5,
+            "no": 0,
+            "low": 1,
+            "medium": 2,
+            "middle": 2,
+            "high" : 3,
+            "very high" : 4,
             }
     relationship_dict = {
-            "no relation": 1,
-            "in relation": 2,
-            "married": 3,
-            "divorced" : 4,
-            "single" : 5,
+            "no relation": 0,
+            "in relation": 1,
+            "married": 2,
+            "divorced" : 3,
+            "single" : 4,
             }
     sex_dict = {
-            "male": 1,
-            "female": 2,
-            "no valid": 3,
+            "male": 0,
+            "female": 1,
+            "no valid": 2,
             }
     education_dict = {
-            "no highschool": 1,
-            "in highschool": 2,
-            "hs diploma": 3,
-            "in college" : 4,
-            "college degree" : 5,
-            "phd" : 6,
+            "no highschool": 0,
+            "in highschool": 1,
+            "hs diploma": 2,
+            "in college" : 3,
+            "college degree" : 4,
+            "phd" : 5,
             }
     indices = []
     labels = []
@@ -166,10 +166,13 @@ if __name__=="__main__":
     
     #load embeddings
     generation_embeds = torch.load(cfg.gen_embeds)
+    print(len(indices))
+    print(len(generation_embeds))
+    generation_embeds_current = [ generation_embeds[i] for i in indices]
 
     assess_device_memory()
 
-    for embed, label in zip(generation_embeds, labels[:10]):
+    for embed, label in zip(generation_embeds_current, labels):
         print("label: ", label)
 
         #labels = torch.Tensor([[1, 0, 1]]).to(device) #one hot labels?
