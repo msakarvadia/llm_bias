@@ -2,6 +2,7 @@ import sys
 sys.path.append('../../')
 import argparse
 import json
+from sklearn.model_selection import train_test_split
 from src.models.model_factory import get_model
 from src.utils.initialization import SafeOpen
 from src.utils.initialization import (
@@ -208,4 +209,7 @@ if __name__=="__main__":
 
     logging.getLogger("transformers").setLevel(logging.ERROR)
     print(labels)
-    predictions = train(seq_model, generation_embeds_current, labels, optimizer, cfg.epochs)
+    
+    x_train, x_test, y_train, y_test = train_test_split(generation_embeds_current, labels, test_size=0.1, random_state=cfg.seed)
+    predictions = train(seq_model, x_train, y_train, optimizer, cfg.epochs)
+    #predictions = train(seq_model, generation_embeds_current, labels, optimizer, cfg.epochs)
