@@ -111,8 +111,9 @@ def train(model, seq_model, inputs, labels_original, optimizer, epochs):
         predictions = []
         avg_loss = 0
         for batch, label in tqdm(zip(prompts, labels_original)):
+            print(batch.get_prompt())
             with torch.no_grad():
-                results, hidden_states, input_len  = model.predict_logits(batch)
+                results, hidden_states, input_len  = model.predict_logits_w_mask(batch)
             new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
             hs = []
             for token in range(len(hidden_states)):
@@ -196,39 +197,11 @@ if __name__=="__main__":
     label_type = "income"
     labels, indices, num_labels = read_label(cfg.gen_human_labels, cfg.demographic)
 
-    #Get gpt2 for sequence classification
-    model_name_or_path = "gpt2"
-
-    # Get model configuration.
-    print('Loading configuration...')
-    print("num labels: ", num_labels)
-    model_config = GPT2Config(num_labels=num_labels,
-                                      n_embd=4096, # This is side of Llama vocab
-                                      n_head=8,
-                                      n_layer=4,
-                                      )
-
-    # Get the actual model.
-    print('Loading model...')
-    seq_model = GPT2ForSequenceClassification(model_config)
-
-    # Get model's tokenizer.
-    print('Loading tokenizer...')
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-    # default to left padding
-    tokenizer.padding_side = "left"
-    # Define PAD Token = EOS Token = 50256
-    tokenizer.pad_token = tokenizer.eos_token
-
-    # resize model embedding to match new tokenizer
-    seq_model.resize_token_embeddings(len(tokenizer))
-
-    # fix model padding token id
-    seq_model.config.pad_token_id = seq_model.config.eos_token_id
-
     # Load model to defined device.
+    seq_model = torch.load(cfg.discrim_path)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     seq_model.to(device)
+    seq_model.eval()
     print('Model loaded to `%s`'%device)
 
     
@@ -236,6 +209,11 @@ if __name__=="__main__":
     generation_embeds = torch.load(cfg.gen_embeds)
     generation_embeds_current = [ generation_embeds[i] for i in indices]
     prompts = [ prompts[i] for i in indices]
+
+    #TODO (MS) temporarily shortening the dataset to three samples:
+    prompts = prompts[:3]
+    labels = labels[:3]
+    #generation_embeds_current = generation_embeds_current[:, :3]
 
     assess_device_memory()
 

@@ -232,4 +232,6 @@ if __name__=="__main__":
     predictions = train(seq_model, x_train, y_train, optimizer, cfg.epochs)
     eval_model(seq_model, x_test, y_test)
 
+    torch.save(seq_model, f'{cfg.demographic}_discrim_model.pt')
+
     #predictions = train(seq_model, generation_embeds_current, labels, optimizer, cfg.epochs)
