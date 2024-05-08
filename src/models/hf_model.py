@@ -46,6 +46,31 @@ class HFModel(BaseModel):
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.padding_side = "left"
 
+    def predict_logits_w_mask(self, input: Prompt, mask, **kwargs):
+        text = input.get_prompt().rstrip()
+
+        model_text = self.apply_model_template(text)
+
+        input_ids = self.tokenizer.encode(
+            model_text,
+            return_tensors="pt",
+        ).to(self.device)
+        input_length = len(input_ids[0])
+        print("input prompt length: ", input_length)
+        
+        output_1 = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, max_new_tokens=1)
+        embeds = output_1.hidden_states[0][-1]
+        print("mask shape: ", mask.shape)
+        print("Shape of original prompt embeddings: ",embeds.shape)
+
+        embeds = torch.cat((mask, embeds), dim=1)
+        output = self.model.generate(inputs_embeds=embeds, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, **self.config.args)
+
+        # For decoder only models:
+        out_ids = output.sequences[:, input_length:]
+
+        return self.tokenizer.decode(out_ids[0], skip_special_tokens=True).strip(), output.hidden_states, input_length
+
     def predict_logits(self, input: Prompt, **kwargs):
         text = input.get_prompt().rstrip()
 

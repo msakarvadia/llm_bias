@@ -488,6 +488,9 @@ class Config(PBM):
     gen_embeds: str = Field(
         default=None, description="File that has embedding of model generations."
     )
+    discrim_path: str = Field(
+        default=None, description="Path to file of trained discriminator."
+    )
     demographic: str = Field(
         default="income", description="Name of demographic category with which to train the discriminator"
     )

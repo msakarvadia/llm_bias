@@ -105,7 +105,7 @@ def read_label(inpath, label_type="income"):
         #num_labels = len(set(labels))
         return labels, indices, num_labels
 
-def train(model, seq_model, inputs, labels_original, optimizer, epochs):
+def train(model, seq_model, inputs, labels_original, optimizer, epochs, mask):
 
     for i in range(epochs):
         predictions = []
@@ -113,7 +113,7 @@ def train(model, seq_model, inputs, labels_original, optimizer, epochs):
         for batch, label in tqdm(zip(prompts, labels_original)):
             print(batch.get_prompt())
             with torch.no_grad():
-                results, hidden_states, input_len  = model.predict_logits_w_mask(batch)
+                results, hidden_states, input_len  = model.predict_logits_w_mask(batch, mask)
             new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
             hs = []
             for token in range(len(hidden_states)):
@@ -225,8 +225,9 @@ if __name__=="__main__":
     logging.getLogger("transformers").setLevel(logging.ERROR)
     print(labels)
     model = get_model(cfg.gen_model)
+    mask = torch.rand(1, 20, 4096).to(device, dtype=torch.bfloat16)
     
     x_train, x_test, y_train, y_test = train_test_split(prompts, labels, test_size=0.1, random_state=cfg.seed)
     #eval_model(seq_model, x_test, y_test)
-    predictions = train(model, seq_model, x_train, y_train, optimizer, cfg.epochs)
+    predictions = train(model, seq_model, x_train, y_train, optimizer, cfg.epochs, mask)
     #eval_model(seq_model, x_test, y_test)
