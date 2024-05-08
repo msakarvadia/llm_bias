@@ -5,6 +5,8 @@ from src.prompts import Prompt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from .model import BaseModel
 
+from undecorated import undecorated
+from types import MethodType
 
 class HFModel(BaseModel):
     curr_models: Dict[str, AutoModelForCausalLM] = {}
@@ -46,6 +48,7 @@ class HFModel(BaseModel):
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.padding_side = "left"
 
+
     def predict_logits_w_mask(self, input: Prompt, mask, **kwargs):
         text = input.get_prompt().rstrip()
 
@@ -58,13 +61,14 @@ class HFModel(BaseModel):
         input_length = len(input_ids[0])
         print("input prompt length: ", input_length)
         
-        output_1 = self.model.generate(input_ids, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, max_new_tokens=1)
+        #NOTE (MS): the generate function is decorated w/ torch.no_grad so to work around it do https://discuss.huggingface.co/t/how-to-output-loss-from-model-generate/16999/12
+        output_1 = self.model.generate.__wrapped__(self.model, input_ids, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, max_new_tokens=1)
         embeds = output_1.hidden_states[0][-1]
         print("mask shape: ", mask.shape)
         print("Shape of original prompt embeddings: ",embeds.shape)
 
         embeds = torch.cat((mask, embeds), dim=1)
-        output = self.model.generate(inputs_embeds=embeds, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, **self.config.args)
+        output = self.model.generate.__wrapped__(self.model, inputs_embeds=embeds, return_dict_in_generate=True, output_logits=False, output_hidden_states=True, **self.config.args)
 
         # For decoder only models:
         out_ids = output.sequences[:, input_length:]

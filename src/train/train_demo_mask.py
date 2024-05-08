@@ -111,8 +111,9 @@ def train(model, seq_model, inputs, labels_original, optimizer, epochs, mask):
         predictions = []
         avg_loss = 0
         for batch, label in tqdm(zip(prompts, labels_original)):
-            print(batch.get_prompt())
-            with torch.no_grad():
+            optimizer.zero_grad()
+            with torch.enable_grad():
+                #print(batch.get_prompt())
                 results, hidden_states, input_len  = model.predict_logits_w_mask(batch, mask)
             new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
             hs = []
@@ -121,6 +122,13 @@ def train(model, seq_model, inputs, labels_original, optimizer, epochs, mask):
                 hs.append(hidden_states[token][layer_num][:, -1, :])
 
             inputs = torch.stack(hs, dim=1) #.to(device)
+            #print("inputs shape: ", inputs.shape)
+            #torch.set_grad_enabled(True)
+            #with torch.enable_grad():
+            #    scalar = inputs.sum()
+            #    scalar.backward()
+
+            #print("After generation mask grad: ", mask.grad)
 
             idx = int(label)
             labels = torch.nn.functional.one_hot(torch.tensor(idx), num_classes = num_labels)
@@ -131,6 +139,9 @@ def train(model, seq_model, inputs, labels_original, optimizer, epochs, mask):
             #print("classifier output loss: ", output.loss)
 
             output.loss.backward()
+            print("Gradients: ",mask.grad)
+            print("Mask: ",mask)
+            optimizer.step()
             avg_loss += output.loss
 
         print("num data points: ", len(labels_original))
@@ -217,16 +228,24 @@ if __name__=="__main__":
 
     assess_device_memory()
 
-    optimizer = torch.optim.AdamW(seq_model.parameters(),
-                                        lr = 2e-5, # default is 5e-5, our notebook had 2e-5
-                                        eps = 1e-8 # default is 1e-8.
-                                        )
 
     logging.getLogger("transformers").setLevel(logging.ERROR)
     print(labels)
     model = get_model(cfg.gen_model)
-    mask = torch.rand(1, 20, 4096).to(device, dtype=torch.bfloat16)
+    mask = torch.rand((1, 20, 4096), requires_grad=True, device=device, dtype=torch.bfloat16)
+    mask.retain_grad()
+    print("mask before optim: ", mask)
+    optimizer = torch.optim.AdamW([mask],
+                                        lr = 2e-5, # default is 5e-5, our notebook had 2e-5
+                                        eps = 1e-8 # default is 1e-8.
+                                        )
     
+    #mask = mask.to(device, dtype=torch.bfloat16)
+    torch.set_grad_enabled(True)
+    with torch.enable_grad():
+        scalar = mask.sum()
+        scalar.backward()
+    print("Mask initial grad: ", mask.grad)
     x_train, x_test, y_train, y_test = train_test_split(prompts, labels, test_size=0.1, random_state=cfg.seed)
     #eval_model(seq_model, x_test, y_test)
     predictions = train(model, seq_model, x_train, y_train, optimizer, cfg.epochs, mask)
