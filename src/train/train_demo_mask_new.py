@@ -123,6 +123,10 @@ def train(
         avg_loss = 0
         for batch, label in tqdm(zip(prompts, labels_original)):
             optimizer.zero_grad()
+            model.model.zero_grad(set_to_none=True)
+            seq_model.zero_grad(set_to_none=True)
+            print(" ")
+            assess_device_memory()
             with torch.enable_grad():
                 # print(batch.get_prompt())
                 results, hidden_states, input_len = model.predict_logits_w_mask(
@@ -147,12 +151,11 @@ def train(
             predictions.append(torch.argmax(output.logits[0]).item())
             # print("classifier output label: ", torch.argmax(output.logits[0]))
             # print("classifier output loss: ", output.loss)
-
             loss = criterion(output.logits, desired_label) - output.loss
             loss.backward()
+
             # output.loss.backward()
-            print("Gradients: ", mask.grad)
-            # print("Mask: ", mask)
+            # print("Gradients: ", mask.grad)
             optimizer.step()
             avg_loss += output.loss
 
@@ -237,9 +240,8 @@ if __name__ == "__main__":
     prompts = [prompts[i] for i in indices]
 
     # TODO (MS) temporarily shortening the dataset to three samples:
-    prompts = prompts[:3]
-    labels = labels[:3]
-    # generation_embeds_current = generation_embeds_current[:, :3]
+    # prompts = prompts[:3]
+    # labels = labels[:3]
 
     assess_device_memory()
 
@@ -247,7 +249,10 @@ if __name__ == "__main__":
     print(labels)
     model = get_model(cfg.gen_model)
     mask = torch.rand(
-        (1, 20, 4096), requires_grad=True, device=device, dtype=torch.bfloat16
+        (1, 5, 4096),
+        requires_grad=True,
+        device=device,
+        dtype=torch.bfloat16,  # mask for 5 token positions
     )
     mask.retain_grad()
     print("mask before optim: ", mask)
