@@ -151,12 +151,11 @@ def train(
             predictions.append(torch.argmax(output.logits[0]).item())
             # print("classifier output label: ", torch.argmax(output.logits[0]))
             # print("classifier output loss: ", output.loss)
-
             loss = criterion(output.logits, desired_label) - output.loss
             loss.backward()
+
             # output.loss.backward()
-            print("Gradients: ", mask.grad)
-            # print("Mask: ", mask)
+            # print("Gradients: ", mask.grad)
             optimizer.step()
             avg_loss += output.loss
 
