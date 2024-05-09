@@ -115,14 +115,21 @@ def read_label(inpath, label_type="income"):
 
 
 def check_gc():
+    num_objects = 0
     for obj in gc.get_objects():
         try:
             if torch.is_tensor(obj) or (
                 hasattr(obj, "data") and torch.is_tensor(obj.data)
             ):
-                print(type(obj), obj.size())
+                # print(type(obj), obj.size())
+                num_objects += 1
         except:
             pass
+    print("NUM OBJECTS IN GPU MEMORY BY GC: ", num_objects)
+
+
+def extract_embeds():
+    return 0
 
 
 def train(
@@ -157,18 +164,17 @@ def train(
             seq_model.zero_grad(set_to_none=True)
             gc.collect()
             torch.cuda.empty_cache()
-            print(torch.cuda.memory_summary())
-            # check_gc()
-            with torch.enable_grad():
-                # print(batch.get_prompt())
-                results, hidden_states, input_len = model.predict_logits_w_mask(
-                    batch, mask
-                )
-            new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
-            print(
-                "new inputs shape: ",
-                new_generation_hidden_states.unsqueeze_(dim=1).shape,
-            )
+            # print(torch.cuda.memory_summary())
+            assess_device_memory()
+            check_gc()
+            # with torch.enable_grad():
+            # print(batch.get_prompt())
+            results, hidden_states, input_len = model.predict_logits_w_mask(batch, mask)
+            # new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
+            # print(
+            #    "new inputs shape: ",
+            #    new_generation_hidden_states.unsqueeze_(dim=1).shape,
+            # )
             hs = []
             for token in range(len(hidden_states)):
                 layer_num = -1
