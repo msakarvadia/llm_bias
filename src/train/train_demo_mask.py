@@ -2,6 +2,7 @@ import sys
 
 sys.path.append("../../")
 import argparse
+import gc
 import json
 from sklearn.model_selection import train_test_split
 from src.models.model_factory import get_model
@@ -113,6 +114,17 @@ def read_label(inpath, label_type="income"):
         return labels, indices, num_labels
 
 
+def check_gc():
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj) or (
+                hasattr(obj, "data") and torch.is_tensor(obj.data)
+            ):
+                print(type(obj), obj.size())
+        except:
+            pass
+
+
 def train(
     model, seq_model, inputs, labels_original, optimizer, epochs, mask, desired_label
 ):
@@ -125,17 +137,21 @@ def train(
             optimizer.zero_grad()
             model.model.zero_grad(set_to_none=True)
             seq_model.zero_grad(set_to_none=True)
+            torch.cuda.empty_cache()
+            print(torch.cuda.memory_summary())
+            # check_gc()
             with torch.enable_grad():
                 # print(batch.get_prompt())
                 results, hidden_states, input_len = model.predict_logits_w_mask(
                     batch, mask
                 )
-            new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
+            # new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
             hs = []
             for token in range(len(hidden_states)):
                 layer_num = -1
                 hs.append(hidden_states[token][layer_num][:, -1, :])
 
+            # TODO (make a placeholder tensor rather than new one every single time
             inputs = torch.stack(hs, dim=1)  # .to(device)
 
             idx = int(label)
@@ -146,6 +162,8 @@ def train(
             output = seq_model(
                 inputs_embeds=inputs, labels=labels
             )  # labels are one-hot
+            del inputs
+            del labels
             predictions.append(torch.argmax(output.logits[0]).item())
             # print("classifier output label: ", torch.argmax(output.logits[0]))
             # print("classifier output loss: ", output.loss)
