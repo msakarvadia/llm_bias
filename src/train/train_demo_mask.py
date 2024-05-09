@@ -123,6 +123,8 @@ def train(
         avg_loss = 0
         for batch, label in tqdm(zip(prompts, labels_original)):
             optimizer.zero_grad()
+            model.model.zero_grad(set_to_none=True)
+            seq_model.zero_grad(set_to_none=True)
             with torch.enable_grad():
                 # print(batch.get_prompt())
                 results, hidden_states, input_len = model.predict_logits_w_mask(
