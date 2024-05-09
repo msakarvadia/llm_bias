@@ -59,7 +59,7 @@ class HFModel(BaseModel):
             return_tensors="pt",
         ).to(self.device)
         input_length = len(input_ids[0])
-        # print("input prompt length: ", input_length)
+        print("input prompt length: ", input_length)
 
         # NOTE (MS): the generate function is decorated w/ torch.no_grad so to work around it do https://discuss.huggingface.co/t/how-to-output-loss-from-model-generate/16999/12
         with torch.no_grad():
@@ -71,9 +71,9 @@ class HFModel(BaseModel):
                 output_hidden_states=True,
                 max_new_tokens=1,
             )
-        embeds = output_1.hidden_states[0][-1]
-        print("mask shape: ", mask.shape)
-        print("Shape of original prompt embeddings: ", embeds.shape)
+            embeds = output_1.hidden_states[0][-1]
+            print("mask shape: ", mask.shape)
+            print("Shape of original prompt embeddings: ", embeds.shape)
 
         embeds = torch.cat((mask, embeds), dim=1)
         output = self.model.generate.__wrapped__(
