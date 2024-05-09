@@ -126,17 +126,36 @@ def check_gc():
 
 
 def train(
-    model, seq_model, inputs, labels_original, optimizer, epochs, mask, desired_label
+    model,
+    seq_model,
+    inputs,
+    labels_original,
+    optimizer,
+    epochs,
+    mask,
+    desired_label,
+    num_labels,
 ):
     criterion = torch.nn.CrossEntropyLoss()
+
+    batch_size = 1
+    labels = torch.FloatTensor(batch_size, num_labels).to(device)
+    labels.zero_()
+    # labels = torch.nn.functional.one_hot(
+    #    torch.tensor(0), num_classes=num_labels
+    # )
+    # labels = torch.unsqueeze(1, labels, 0).to(torch.float).to(device)
+    print("label shape: ", labels.shape)
 
     for i in range(epochs):
         predictions = []
         avg_loss = 0
         for batch, label in tqdm(zip(prompts, labels_original)):
+            labels.zero_()
             optimizer.zero_grad()
             model.model.zero_grad(set_to_none=True)
             seq_model.zero_grad(set_to_none=True)
+            gc.collect()
             torch.cuda.empty_cache()
             print(torch.cuda.memory_summary())
             # check_gc()
@@ -145,25 +164,31 @@ def train(
                 results, hidden_states, input_len = model.predict_logits_w_mask(
                     batch, mask
                 )
-            # new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
+            new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
+            print(
+                "new inputs shape: ",
+                new_generation_hidden_states.unsqueeze_(dim=1).shape,
+            )
             hs = []
             for token in range(len(hidden_states)):
                 layer_num = -1
                 hs.append(hidden_states[token][layer_num][:, -1, :])
+            print(hidden_states[-1][-1][:, -1, :])
+            # print(hidden_states[-1][-1][:,-1,:])
 
             # TODO (make a placeholder tensor rather than new one every single time
             inputs = torch.stack(hs, dim=1)  # .to(device)
+            print("working inputs shape: ", inputs.shape)
 
-            idx = int(label)
-            labels = torch.nn.functional.one_hot(
-                torch.tensor(idx), num_classes=num_labels
-            )
-            labels = torch.unsqueeze(labels, 0).to(torch.float).to(device)
+            labels[0, label] = 1
             output = seq_model(
                 inputs_embeds=inputs, labels=labels
             )  # labels are one-hot
+            # inputs.detach_()
+            # labels.detach_()
             del inputs
-            del labels
+            del hidden_states
+            # del labels
             predictions.append(torch.argmax(output.logits[0]).item())
             # print("classifier output label: ", torch.argmax(output.logits[0]))
             # print("classifier output loss: ", output.loss)
@@ -176,9 +201,12 @@ def train(
             optimizer.step()
             avg_loss += output.loss
 
+        desired_labels = [desired_label.item()] * len(labels_original)
+        print("desired_labels: ", desired_labels)
+        print("predictions: ", predictions)
         print("num data points: ", len(labels_original))
         print("Avg Loss: ", avg_loss / len(labels_original))
-        train_acc = accuracy_score(labels_original, predictions)
+        train_acc = accuracy_score(desired_labels, predictions)
         print("Train acc: ", train_acc)
 
     return predictions
@@ -257,8 +285,8 @@ if __name__ == "__main__":
     prompts = [prompts[i] for i in indices]
 
     # TODO (MS) temporarily shortening the dataset to three samples:
-    # prompts = prompts[:5]
-    # labels = labels[:5]
+    prompts = prompts[7:11]
+    labels = labels[7:11]
     # generation_embeds_current = generation_embeds_current[:, :3]
 
     assess_device_memory()
@@ -269,7 +297,7 @@ if __name__ == "__main__":
     mask = torch.rand(
         (1, 20, 4096), requires_grad=True, device=device, dtype=torch.bfloat16
     )
-    mask.retain_grad()
+    # mask.retain_grad()
     print("mask before optim: ", mask)
     optimizer = torch.optim.AdamW(
         [mask],
@@ -277,18 +305,20 @@ if __name__ == "__main__":
         eps=1e-8,  # default is 1e-8.
     )
 
-    # mask = mask.to(device, dtype=torch.bfloat16)
-    torch.set_grad_enabled(True)
-    with torch.enable_grad():
-        scalar = mask.sum()
-        scalar.backward()
-    print("Mask initial grad: ", mask.grad)
     x_train, x_test, y_train, y_test = train_test_split(
         prompts, labels, test_size=0.1, random_state=cfg.seed
     )
     # eval_model(seq_model, x_test, y_test)
     desired_label = torch.tensor([0], device=device)
     predictions = train(
-        model, seq_model, x_train, y_train, optimizer, cfg.epochs, mask, desired_label
+        model,
+        seq_model,
+        x_train,
+        y_train,
+        optimizer,
+        cfg.epochs,
+        mask,
+        desired_label,
+        num_labels,
     )
     # eval_model(seq_model, x_test, y_test)
