@@ -237,8 +237,8 @@ if __name__ == "__main__":
     prompts = [prompts[i] for i in indices]
 
     # TODO (MS) temporarily shortening the dataset to three samples:
-    prompts = prompts[:3]
-    labels = labels[:3]
+    prompts = prompts[:5]
+    labels = labels[:5]
     # generation_embeds_current = generation_embeds_current[:, :3]
 
     assess_device_memory()
