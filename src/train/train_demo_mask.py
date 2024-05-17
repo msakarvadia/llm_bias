@@ -305,7 +305,10 @@ if __name__ == "__main__":
     print(labels)
     model = get_model(cfg.gen_model)
     mask = torch.rand(
-        (1, 5, 4096), requires_grad=True, device=device, dtype=torch.bfloat16
+        (1, 5, 4096),
+        requires_grad=True,
+        device=device,
+        dtype=torch.bfloat16,  # mask for 5 token positions
     )
     # mask.retain_grad()
     print("mask before optim: ", mask)
