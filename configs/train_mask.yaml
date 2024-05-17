@@ -4,7 +4,7 @@ task: "REDDIT"
 dryrun: False
 save_prompts: True
 timeout: 0.0
-epochs: 1
+epochs: 10
 demographic: "gender"
 discrim_path: "/pscratch/sd/m/mansisak/llm_bias/src/train/gender_discrim_model.pt"
 gen_embeds: "/pscratch/sd/m/mansisak/llm_bias/src/train/embeddings_llama7b_generation_last_layer_embeddings.pt" 
@@ -21,5 +21,5 @@ gen_model:
   device: "auto"
   max_workers: 2
   args: {
-    max_new_tokens: 500,
+    max_new_tokens: 100,
   }
