@@ -186,7 +186,7 @@ def train(
             inputs = torch.stack(hs, dim=1)  # .to(device)
             print("working inputs shape: ", inputs.shape)
 
-            labels[0, label] = 1
+            labels[0, desired_label] = 1
             print("original label: ", label)
             print("desired labels: ", labels)
             output = seq_model(
@@ -208,7 +208,7 @@ def train(
             # print("Gradients: ", mask.grad)
             # print("Mask: ", mask)
             optimizer.step()
-            avg_loss += output.loss
+            # avg_loss += output.loss
             print("_______________________________")
 
         desired_labels = [desired_label.item()] * len(labels_original)
@@ -219,7 +219,7 @@ def train(
         train_acc = accuracy_score(desired_labels, predictions)
         print("Train acc: ", train_acc)
 
-    return predictions
+    return 0  # predictions
 
 
 def eval_model(model, inputs, labels_original):
