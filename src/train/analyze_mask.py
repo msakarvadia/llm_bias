@@ -102,6 +102,6 @@ if __name__ == "__main__":
     print(trained_mask)
     print(trained_mask.shape)
 
-    get_top_k_vocab_from_mask(trained_mask, embed_mat, k=20, tokenizer=model.tokenizer)
+    get_top_k_vocab_from_mask(trained_mask, embed_mat, k=100, tokenizer=model.tokenizer)
 
 # Project mask values into vocab space using LLM's embedding matrix:

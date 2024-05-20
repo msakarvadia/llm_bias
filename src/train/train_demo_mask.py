@@ -206,7 +206,7 @@ def train(
             loss.backward()
             # output.loss.backward()
             # print("Gradients: ", mask.grad)
-            # print("Mask: ", mask)
+            print("Mask: ", mask)
             optimizer.step()
             # avg_loss += output.loss
             print("_______________________________")
