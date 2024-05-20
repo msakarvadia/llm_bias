@@ -318,6 +318,39 @@ if __name__ == "__main__":
         device=device,
         dtype=torch.bfloat16,  # mask for 5 token positions
     )
+
+    embed_mat = 0
+    for name, param in model.model.named_parameters():
+        # if param.requires_grad:
+        #    print( name)
+        if name == "model.embed_tokens.weight":
+            print("embedding shape: ", param.shape)
+            embed_mat = param
+
+    # initialize mask:
+    initialization_str = "I am a woman."
+    tokenized_str = model.tokenizer(initialization_str)
+    print(tokenized_str["input_ids"])
+    one_hot_tokens = torch.nn.functional.one_hot(
+        torch.Tensor(tokenized_str["input_ids"]).to(torch.int64), num_classes=32000
+    )
+    one_hot_tokens = one_hot_tokens[1:].to(
+        torch.bfloat16
+    )  # convert dtypes and get rid of bos token
+
+    initialized_mask = one_hot_tokens.to(device) @ embed_mat
+    initialized_mask = initialized_mask.to(torch.float64)
+    # TODO add batch dim and require grad
+    initialized_mask = initialized_mask.unsqueeze_(dim=0)
+    # initialized_mask = initialized_mask.requires_grad_()
+    mask = torch.tensor(
+        initialized_mask.detach().cpu().numpy(),
+        requires_grad=True,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+    print("mask is leaf tensor: ", mask.is_leaf)
+
     # mask.retain_grad()
     print("mask before optim: ", mask)
     optimizer = torch.optim.AdamW(
@@ -344,6 +377,6 @@ if __name__ == "__main__":
         desired_label,
         num_labels,
     )
-    torch.save(mask, "gender_mask_female.pt")
+    torch.save(mask, "non_random_gender_mask_female.pt")
 
     eval_model(model, seq_model, x_test, y_test, desired_label, mask)

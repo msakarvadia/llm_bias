@@ -488,14 +488,17 @@ class Config(PBM):
     gen_embeds: str = Field(
         default=None, description="File that has embedding of model generations."
     )
+    mask_name: str = Field(default=None, description="Path to the mask *.pt file.")
     discrim_path: str = Field(
         default=None, description="Path to file of trained discriminator."
     )
     demographic: str = Field(
-        default="income", description="Name of demographic category with which to train the discriminator"
+        default="income",
+        description="Name of demographic category with which to train the discriminator",
     )
     gen_human_labels: str = Field(
-        default=None, description="File that has the human evaluated labels for model generation."
+        default=None,
+        description="File that has the human evaluated labels for model generation.",
     )
     task_config: (
         ACSConfig
@@ -521,9 +524,7 @@ class Config(PBM):
     timeout: int = Field(
         0.5, description="Timeout in seconds between requests for API restrictions"
     )
-    epochs: int = Field(
-        10, description="Num epochs to train discrim for"
-    )
+    epochs: int = Field(10, description="Num epochs to train discrim for")
 
     def get_out_path(self, file_name) -> str:
         path_prefix = "results" if self.output_dir is None else self.output_dir

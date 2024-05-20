@@ -50,189 +50,15 @@ from transformers import (
 )
 
 
-def read_label(inpath, label_type="income"):
-    income_dict = {
-        "no": 0,
-        "low": 1,
-        "medium": 2,
-        "middle": 2,
-        "high": 3,
-        "very high": 4,
-    }
-    relationship_dict = {
-        "no relation": 0,
-        "in relation": 1,
-        "married": 2,
-        "divorced": 3,
-        "single": 4,
-    }
-    sex_dict = {
-        "male": 0,
-        "female": 1,
-        "no valid": 2,
-    }
-    education_dict = {
-        "no highschool": 0,
-        "in highschool": 1,
-        "hs diploma": 2,
-        "in college": 3,
-        "college degree": 4,
-        "phd": 5,
-    }
-    indices = []
-    labels = []
-    with SafeOpen(inpath) as infile:
-        count = 0
-        for line in tqdm(infile.lines, desc="Reading label", position=0):
-            d = json.loads(line)
-            pii = d["reviews"]["synth"]
-            assert len(pii) == 1, "expected only one pii"
-            pii_type = list(pii.keys())[0]
-            label = d["evaluations"]["guess_label"]
-            if pii_type == "income" and label_type == "income":
-                assert label in income_dict.keys()
-                indices.append(count)
-                labels.append(income_dict[label])
-                num_labels = len(set(income_dict.values()))
-            if pii_type == "married" and label_type == "married":
-                assert label in relationship_dict.keys()
-                indices.append(count)
-                labels.append(relationship_dict[label])
-                num_labels = len(set(relationship_dict.values()))
-            if pii_type == "gender" and label_type == "gender":
-                assert label in sex_dict.keys()
-                indices.append(count)
-                labels.append(sex_dict[label])
-                num_labels = len(set(sex_dict.values()))
-            if pii_type == "education" and label_type == "education":
-                assert label in education_dict.keys()
-                indices.append(count)
-                labels.append(education_dict[label])
-                num_labels = len(set(education_dict.values()))
-            count += 1
-        # num_labels = len(set(labels))
-        return labels, indices, num_labels
+def get_top_k_vocab_from_mask(mask, embed_mat, k, tokenizer):
 
+    transformed_output = mask @ embed_mat.T
+    val, top_tokens = torch.topk(transformed_output, dim=2, k=k)
+    print(top_tokens)
+    print(transformed_output.shape)
+    for tokens in top_tokens[0]:
+        print(tokenizer.decode(tokens.tolist()))
 
-def train(
-    model,
-    seq_model,
-    prompts,
-    labels_original,
-    optimizer,
-    epochs,
-    mask,
-    desired_label,
-    num_labels,
-):
-    criterion = torch.nn.CrossEntropyLoss()
-
-    batch_size = 1
-    labels = torch.FloatTensor(batch_size, num_labels).to(device)
-    labels.zero_()
-    # labels = torch.nn.functional.one_hot(
-    #    torch.tensor(0), num_classes=num_labels
-    # )
-    # labels = torch.unsqueeze(1, labels, 0).to(torch.float).to(device)
-    # print("label shape: ", labels.shape)
-
-    for i in range(epochs):
-        predictions = []
-        avg_loss = 0
-        for batch, label in tqdm(zip(prompts, labels_original)):
-            labels.zero_()
-            optimizer.zero_grad()
-            model.model.zero_grad(set_to_none=True)
-            seq_model.zero_grad(set_to_none=True)
-            gc.collect()
-            torch.cuda.empty_cache()
-            # print(torch.cuda.memory_summary())
-            assess_device_memory()
-            check_gc()
-            # with torch.enable_grad():
-            # print(batch.get_prompt())
-            results, hidden_states, input_len = model.predict_logits_w_mask(batch, mask)
-            # new_generation_hidden_states = hidden_states[0][-1][:, -1, :]
-            # print(
-            #    "new inputs shape: ",
-            #    new_generation_hidden_states.unsqueeze_(dim=1).shape,
-            # )
-            hs = []
-            for token in range(len(hidden_states)):
-                layer_num = -1
-                hs.append(hidden_states[token][layer_num][:, -1, :])
-            print(hidden_states[-1][-1][:, -1, :])
-            # print(hidden_states[-1][-1][:,-1,:])
-
-            # TODO (make a placeholder tensor rather than new one every single time
-            inputs = torch.stack(hs, dim=1)  # .to(device)
-            print("working inputs shape: ", inputs.shape)
-
-            labels[0, desired_label] = 1
-            print("original label: ", label)
-            print("desired labels: ", labels)
-            output = seq_model(
-                inputs_embeds=inputs, labels=labels
-            )  # labels are one-hot
-            # inputs.detach_()
-            # labels.detach_()
-            del inputs
-            del hidden_states
-            # del labels
-            predictions.append(torch.argmax(output.logits[0]).item())
-            print("classifier output prediction: ", torch.argmax(output.logits[0]))
-            print("desired label: ", desired_label)
-
-            loss = criterion(output.logits, desired_label) - output.loss
-            print("classifier output loss: ", loss)
-            loss.backward()
-            # output.loss.backward()
-            # print("Gradients: ", mask.grad)
-            # print("Mask: ", mask)
-            optimizer.step()
-            # avg_loss += output.loss
-            print("_______________________________")
-
-        desired_labels = [desired_label.item()] * len(labels_original)
-        print("desired_labels: ", desired_labels)
-        print("predictions: ", predictions)
-        print("num data points: ", len(labels_original))
-        print("Avg Loss: ", avg_loss / len(labels_original))
-        train_acc = accuracy_score(desired_labels, predictions)
-        print("Train acc: ", train_acc)
-
-    return 0  # predictions
-
-
-def eval_model(model, seq_model, inputs, labels_original, desired_label):
-    print("Evaluating model-------")
-    seq_model.eval()
-    batch_size = 1
-    labels = torch.FloatTensor(batch_size, num_labels).to(device)
-    labels.zero_()
-    labels[0, desired_label] = 1
-    with torch.no_grad():
-        predictions = []
-        avg_loss = 0
-        for batch, label in tqdm(zip(prompts, labels_original)):
-            results, hidden_states, input_len = model.predict_logits_w_mask(batch, mask)
-            hs = []
-            for token in range(len(hidden_states)):
-                layer_num = -1
-                hs.append(hidden_states[token][layer_num][:, -1, :])
-
-            inputs = torch.stack(hs, dim=1)  # .to(device)
-
-            output = seq_model(
-                inputs_embeds=inputs, labels=labels
-            )  # labels are one-hot
-            predictions.append(torch.argmax(output.logits[0]).item())
-
-        print("num data points: ", len(labels_original))
-        print("Eval Avg Loss: ", avg_loss / len(labels_original))
-        train_acc = accuracy_score(labels_original, predictions)
-        print("Eval acc: ", train_acc)
-        return
     return 0
 
 
@@ -253,23 +79,6 @@ if __name__ == "__main__":
     set_credentials(cfg)
     # f, path = get_out_file(cfg)
 
-    # Load data
-    print("loading data...")
-    synthetic_data_path = "../../data/synthetic_dataset.jsonl"
-    profiles = load_data(synthetic_data_path)
-    print(profiles[0].comments)
-
-    # Create prompts
-    prompts = []
-    for profile in profiles:
-        prompt = create_prompts(profile)
-        prompts += prompt
-
-    # load human labels
-    print("human labeled eval path: ", cfg.gen_human_labels)
-    label_type = "income"
-    labels, indices, num_labels = read_label(cfg.gen_human_labels, cfg.demographic)
-
     # Load model to defined device.
     seq_model = torch.load(cfg.discrim_path)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -279,11 +88,13 @@ if __name__ == "__main__":
 
     # Load LLM
     model = get_model(cfg.gen_model)
-
-    # load embeddings
-    generation_embeds = torch.load(cfg.gen_embeds)
-    generation_embeds_current = [generation_embeds[i] for i in indices]
-    prompts = [prompts[i] for i in indices]
+    embed_mat = 0
+    for name, param in model.model.named_parameters():
+        if param.requires_grad:
+            print(name)
+        if name == "model.embed_tokens.weight":
+            print("embedding shape: ", param.shape)
+            embed_mat = param
 
     # Load trained Mask
     trained_mask = torch.load(cfg.mask_name)
@@ -291,5 +102,6 @@ if __name__ == "__main__":
     print(trained_mask)
     print(trained_mask.shape)
 
+    get_top_k_vocab_from_mask(trained_mask, embed_mat, k=20, tokenizer=model.tokenizer)
 
 # Project mask values into vocab space using LLM's embedding matrix:
