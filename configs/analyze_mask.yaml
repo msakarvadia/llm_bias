@@ -6,6 +6,7 @@ save_prompts: True
 timeout: 0.0
 epochs: 1
 demographic: "gender"
+mask_name: "gender_mask_female.pt"
 discrim_path: "/pscratch/sd/m/mansisak/llm_bias/src/train/gender_discrim_model.pt"
 gen_embeds: "/pscratch/sd/m/mansisak/llm_bias/src/train/embeddings_llama7b_generation_last_layer_embeddings.pt" 
 gen_human_labels: "/pscratch/sd/m/mansisak/llm_bias/data/predicted_synthethic_llama2_7b_eval_human_fixed.jsonl" 

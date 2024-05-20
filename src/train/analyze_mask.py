@@ -114,24 +114,6 @@ def read_label(inpath, label_type="income"):
         return labels, indices, num_labels
 
 
-def check_gc():
-    num_objects = 0
-    for obj in gc.get_objects():
-        try:
-            if torch.is_tensor(obj) or (
-                hasattr(obj, "data") and torch.is_tensor(obj.data)
-            ):
-                # print(type(obj), obj.size())
-                num_objects += 1
-        except:
-            pass
-    print("NUM OBJECTS IN GPU MEMORY BY GC: ", num_objects)
-
-
-def extract_embeds():
-    return 0
-
-
 def train(
     model,
     seq_model,
@@ -219,10 +201,10 @@ def train(
         train_acc = accuracy_score(desired_labels, predictions)
         print("Train acc: ", train_acc)
 
-    return mask  # predictions
+    return 0  # predictions
 
 
-def eval_model(model, seq_model, inputs, labels_original, desired_label, mask):
+def eval_model(model, seq_model, inputs, labels_original, desired_label):
     print("Evaluating model-------")
     seq_model.eval()
     batch_size = 1
@@ -245,8 +227,6 @@ def eval_model(model, seq_model, inputs, labels_original, desired_label, mask):
                 inputs_embeds=inputs, labels=labels
             )  # labels are one-hot
             predictions.append(torch.argmax(output.logits[0]).item())
-            print("classifier output prediction: ", torch.argmax(output.logits[0]))
-            print("desired label: ", desired_label)
 
         print("num data points: ", len(labels_original))
         print("Eval Avg Loss: ", avg_loss / len(labels_original))
@@ -297,53 +277,19 @@ if __name__ == "__main__":
     seq_model.eval()
     print("Model loaded to `%s`" % device)
 
+    # Load LLM
+    model = get_model(cfg.gen_model)
+
     # load embeddings
     generation_embeds = torch.load(cfg.gen_embeds)
     generation_embeds_current = [generation_embeds[i] for i in indices]
     prompts = [prompts[i] for i in indices]
 
-    # TODO (MS) temporarily shortening the dataset to three samples:
-    # prompts = prompts[7:11]
-    # labels = labels[7:11]
-    # generation_embeds_current = generation_embeds_current[:, :3]
+    # Load trained Mask
+    trained_mask = torch.load(cfg.mask_name)
 
-    assess_device_memory()
+    print(trained_mask)
+    print(trained_mask.shape)
 
-    logging.getLogger("transformers").setLevel(logging.ERROR)
-    print(labels)
-    model = get_model(cfg.gen_model)
-    mask = torch.rand(
-        (1, 5, 4096),
-        requires_grad=True,
-        device=device,
-        dtype=torch.bfloat16,  # mask for 5 token positions
-    )
-    # mask.retain_grad()
-    print("mask before optim: ", mask)
-    optimizer = torch.optim.AdamW(
-        [mask],
-        lr=0.1,  # default is 5e-5, our notebook had 2e-5 #lr = 2 is too high
-        eps=1e-8,  # default is 1e-8.
-    )
 
-    x_train, x_test, y_train, y_test = train_test_split(
-        prompts, labels, test_size=0.1, random_state=cfg.seed
-    )
-    desired_label = torch.tensor([1], device=device)
-
-    eval_model(model, seq_model, x_test, y_test, desired_label, mask)
-
-    mask = train(
-        model,
-        seq_model,
-        x_train,
-        y_train,
-        optimizer,
-        cfg.epochs,
-        mask,
-        desired_label,
-        num_labels,
-    )
-    torch.save(mask, "gender_mask_female.pt")
-
-    eval_model(model, seq_model, x_test, y_test, desired_label, mask)
+# Project mask values into vocab space using LLM's embedding matrix:
