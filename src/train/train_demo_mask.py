@@ -222,23 +222,29 @@ def train(
     return 0  # predictions
 
 
-def eval_model(model, inputs, labels_original):
+def eval_model(model, seq_model, inputs, labels_original, desired_label):
     print("Evaluating model-------")
-    model.eval()
+    seq_model.eval()
+    batch_size = 1
+    labels = torch.FloatTensor(batch_size, num_labels).to(device)
+    labels.zero_()
+    labels[0, desired_label] = 1
     with torch.no_grad():
         predictions = []
         avg_loss = 0
-        for batch, label in tqdm(zip(inputs, labels_original)):
+        for batch, label in tqdm(zip(prompts, labels_original)):
+            results, hidden_states, input_len = model.predict_logits_w_mask(batch, mask)
+            hs = []
+            for token in range(len(hidden_states)):
+                layer_num = -1
+                hs.append(hidden_states[token][layer_num][:, -1, :])
 
-            idx = int(label)
-            labels = torch.nn.functional.one_hot(
-                torch.tensor(idx), num_classes=num_labels
-            )
-            labels = torch.unsqueeze(labels, 0).to(torch.float).to(device)
-            output = seq_model(inputs_embeds=batch, labels=labels)  # labels are one-hot
+            inputs = torch.stack(hs, dim=1)  # .to(device)
+
+            output = seq_model(
+                inputs_embeds=inputs, labels=labels
+            )  # labels are one-hot
             predictions.append(torch.argmax(output.logits[0]).item())
-
-            avg_loss += output.loss
 
         print("num data points: ", len(labels_original))
         print("Eval Avg Loss: ", avg_loss / len(labels_original))
@@ -321,8 +327,10 @@ if __name__ == "__main__":
     x_train, x_test, y_train, y_test = train_test_split(
         prompts, labels, test_size=0.1, random_state=cfg.seed
     )
-    # eval_model(seq_model, x_test, y_test)
     desired_label = torch.tensor([1], device=device)
+
+    eval_model(model, seq_model, x_test, y_test, desired_label)
+
     predictions = train(
         model,
         seq_model,
@@ -334,4 +342,6 @@ if __name__ == "__main__":
         desired_label,
         num_labels,
     )
-    # eval_model(seq_model, x_test, y_test)
+    torch.save(mask, "gender_mask_female.pt")
+
+    eval_model(model, seq_model, x_test, y_test, desired_label)
