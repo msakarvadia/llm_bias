@@ -5,9 +5,6 @@ from src.prompts import Prompt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from .model import BaseModel
 
-from undecorated import undecorated
-from types import MethodType
-
 
 class HFModel(BaseModel):
     curr_models: Dict[str, AutoModelForCausalLM] = {}
@@ -106,7 +103,6 @@ class HFModel(BaseModel):
         output = self.model.generate(
             input_ids,
             return_dict_in_generate=True,
-            output_logits=False,
             output_hidden_states=True,
             **self.config.args
         )

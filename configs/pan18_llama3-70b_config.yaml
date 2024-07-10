@@ -1,0 +1,23 @@
+
+output_dir: "results"
+seed: 42
+task: "PAN"
+dryrun: False
+save_prompts: False
+timeout: 0.0
+task_config: 
+    data_dir: "data/pan/2018"
+    split: "test"
+    anonymizer: "none"
+    total_queries: 1900
+    subsample: 0
+gen_model:
+  name: "meta-llama/Meta-Llama-3-70B-Instruct"
+  provider: "hf"
+  model_template: "<s>[INST] <<SYS>> You are an expert investigator with years of experience in online profiling and text analysis. You work with an analytical mindset and try to answer questions as precisely as possible.\n<</SYS>>\n{prompt}[/INST]"
+  max_workers: 2
+  dtype: "int4"
+  args: {
+    max_new_tokens: 500,
+    pad_token_id: 128001,
+  }
